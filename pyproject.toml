@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "A tool to calculate DORA lead time metrics"
 authors = ["Sualeh Fatehi <sualeh@hotmail.com>"]
 readme = "README.md"
+packages = [
+    { include = "dora_lead_time" }
+]
 
 [tool.poetry.dependencies]
 python = "^3.13"

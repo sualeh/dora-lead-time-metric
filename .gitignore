@@ -1,4 +1,5 @@
 *.db
+poetry.lock
 
 # Created by https://www.toptal.com/developers/gitignore/api/dotenv,python,jupyternotebooks,visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=dotenv,python,jupyternotebooks,visualstudiocode
