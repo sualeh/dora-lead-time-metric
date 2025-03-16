@@ -8,7 +8,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  build-test:
+    name: Build and Test
     runs-on: ubuntu-latest
 
     steps:
