@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-toolsai.jupyter",
+    "ms-toolsai.datawrangler",
+    "yy0931.vscode-sqlite3-editor",
+    "EditorConfig.EditorConfig",
+    "ms-toolsai.jupyter-renderers",
+    "ms-toolsai.jupyter-keymap",
+    "ms-toolsai.jupyterlab"
+  ]
+}
