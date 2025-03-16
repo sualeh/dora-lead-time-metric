@@ -2,11 +2,11 @@
 name = "dora-lead-time-metric"
 version = "0.1.0"
 description = "A tool to calculate DORA lead time metrics"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["Sualeh Fatehi <sualeh@hotmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.13"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"

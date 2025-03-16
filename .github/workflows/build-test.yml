@@ -36,10 +36,4 @@ jobs:
 
     - id: run-tests
       name: Run tests with coverage
-      run: poetry run pytest --cov=dora_lead_time tests/
-
-    - id: upload-coverage
-      name: Upload coverage report
-      uses: codecov/codecov-action@v3
-      with:
-        fail_ci_if_error: false
+      run: poetry run pytest
