@@ -1,0 +1,52 @@
+# Git
+.git
+.gitignore
+.github
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.env
+.venv
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Data directories (these will be mounted as volumes)
+/data/
+/data/docs/
+/data/vector_db/
+
+# Logs
+*.log
+logs/
+
+# Local configuration
+.local/
+
+# Docker specific
+tests/
+docs/
+*.md
+!README.md

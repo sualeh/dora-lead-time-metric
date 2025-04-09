@@ -2,20 +2,31 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-# Install Poetry
-RUN pip install poetry
+ENV \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_ROOT_USER_ACTION=ignore \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
-# Copy poetry config files
-COPY pyproject.toml poetry.lock* ./
+RUN \
+    pip install --upgrade pip && \
+    pip install poetry
 
-# Configure poetry to not create a virtual environment
-RUN poetry config virtualenvs.create false
+COPY . .
 
-# Copy the application
-COPY dora_lead_time/ ./dora_lead_time/
+RUN \
+    poetry config virtualenvs.create false && \
+    poetry install --only main
 
-# Install dependencies
-RUN poetry install --no-dev
+# Create directories for mounting volumes
+RUN \
+    mkdir -p /data/docs /data/vector_db && \
+    # Create a non-root user to run the application
+    adduser --disabled-password --gecos "" appuser && \
+    chown -R appuser:appuser /app /data
 
-# Set the entrypoint
+# Switch to non-root user
+USER appuser
+
 ENTRYPOINT ["python", "-m", "dora_lead_time.main"]

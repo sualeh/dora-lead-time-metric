@@ -2,8 +2,11 @@
 name = "dora-lead-time-metric"
 version = "0.1.0"
 description = "A tool to calculate the DORA Lead Time metric"
-authors = ["Sualeh Fatehi <sualeh@hotmail.com>"]
+authors = [
+    {name = "Sualeh Fatehi",email = "sualeh@hotmail.com"}
+]
 readme = "README.md"
+
 packages = [
     { include = "dora_lead_time" }
 ]
@@ -33,3 +36,4 @@ python_functions = "test_*"
 
 [tool.poetry.scripts]
 dora-lead-time = "dora_lead_time.main:main"
+
