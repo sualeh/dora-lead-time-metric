@@ -8,16 +8,28 @@ packages = [
     { include = "dora_lead_time" }
 ]
 
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
 [tool.poetry.dependencies]
-python = "^3.13"
+python = ">=3.13,<4.0"
+python-dotenv = ">=1.1.0,<2.0.0"
+requests = "^2.32.3"
+matplotlib = "^3.10.0"
+numpy = "^2.2.3"
+pandas = "^2.2.3"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
+jupyter = "^1.1.1"
 pytest-cov = "^6.1.1"
 
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
 
 [tool.poetry.scripts]
 dora-lead-time = "dora_lead_time.main:main"

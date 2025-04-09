@@ -34,6 +34,16 @@ jobs:
       name: Install dependencies
       run: poetry install
 
+    - id: check-compilation
+      name: Check code compilation
+      run: |
+        echo "Checking Python syntax..."
+        poetry run python -m compileall -q .
+        echo "Python syntax check completed successfully"
+
     - id: run-tests
-      name: Run tests with coverage
-      run: poetry run pytest
+      name: Run tests
+      run: |
+        echo "Running tests..."
+        poetry run pytest
+        echo "Tests completed successfully"
