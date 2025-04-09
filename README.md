@@ -57,10 +57,10 @@ poetry run pytest --cov=dora_lead_time tests/
 
 Build the Docker image:
 ```bash
-docker build -t dora-lead-time .
+docker build -t dora-lead-time-metric .
 ```
 
 Run the container:
 ```bash
-docker run dora-lead-time
+docker run dora-lead-time-metric
 ```
