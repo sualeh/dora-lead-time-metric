@@ -13,22 +13,85 @@ Typical lead time ranges:
 
 These tools help calculate lead time by tracking pull request timestamps from creation to merge, which is one component of the overall lead time metric.
 
+## How to Use
 
-## Environment Configuration
-
-The application requires several environment variables to be set in a `.env` file:
-
-### GitHub Configuration
+See [Calculate the DORA Lead Time Metric in Python](https://dev.to/sualeh/calculate-the-dora-lead-time-metric-in-python-2bhn) for a detailed explanation of how to use this code. The code is at [sualeh/dora-lead-time-metric](https://github.com/sualeh/dora-lead-time-metric).
 
 
-### Atlassian Configuration
-- `ATLASSIAN_TOKEN`: API token for Atlassian/Jira access
-  - Generate from Atlassian Account Settings → Security → API tokens
-  - Used for retrieving Jira ticket information
+## Build
 
-- `JIRA_INSTANCE`: Your Jira instance URL (e.g., `company.atlassian.net`)
-  - This is the domain portion of your Jira URL
+Install
 
-- `EMAIL`: Your Atlassian account email address
-  - Required for Jira API authentication
-  - Should match the email associated with your Atlassian account
+- Python 3.13 or higher
+- Poetry (Python dependency manager)
+
+Clone the repository:
+
+  ```bash
+  git clone https://github.com/sualeh/dora-lead-time-metric.git
+  cd dora-lead-time-metric
+  ```
+
+Install dependencies using Poetry:
+
+```bash
+poetry install
+```
+
+Create an `.env` file in the project root based on `.env.example`
+
+Activate the Poetry environment:
+
+```bash
+poetry shell
+```
+
+Run the main application:
+
+```bash
+python -m dora_lead_time.main
+```
+
+Generate reports with code similar to the following:
+
+```python
+from dora_lead_time.lead_time_report import LeadTimeReport
+
+# Initialize the report generator
+report = LeadTimeReport("releases.db")
+
+# Generate a monthly report
+monthly_data = report.monthly_lead_time_report(
+    ["PROJECT1", "PROJECT2"],
+    date(2023, 1, 1),
+    date(2023, 12, 31)
+)
+
+# Visualize the report
+plt = report.show_plot(monthly_data, title="Monthly Lead Time", show_trend=True)
+plt.savefig('lead_time_trend.png')
+```
+
+
+## With Docker
+
+Build the Docker image:
+
+```bash
+docker build -t dora-lead-time-metric .
+```
+
+or download it from Docker Hub:
+
+```bash
+docker pull sualeh.fatehi/dora-lead-time-metric
+```
+
+Run the container:
+
+```bash
+docker run -it --rm \
+  --env-file .env \
+  -v "$(pwd)/data:/data" \
+  dora-lead-time-metric
+```
