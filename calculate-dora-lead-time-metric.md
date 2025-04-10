@@ -54,6 +54,35 @@ To effectively use this approach, you need to understand how to manage the key c
 
 The [`dora-lead-time`](https://pypi.org/project/dora-lead-time-metric/) package provides a simple way to calculate and visualize lead time metrics. It connects to your Jira and GitHub data, calculates lead times, and generates reports. Here is how you might use the package to generate a monthly lead time report:
 
+First set up your tokens to access Jira and GitHub. Set the following environmental variables.
+
+1. Create `ATLASSIAN_TOKEN` containing the API token for Atlassian Jira access.
+2. Create `JIRA_INSTANCE` for your Jira instance URL (e.g., `company.atlassian.net`)
+3. Create `EMAIL` for your Atlassian account email address.
+4. Create personal access tokens for each GitHub organization, for example, `GITHUB_TOKEN_ORG1`, `GITHUB_TOKEN_ORG2`, etc. to authenticate API requests to specific GitHub organizations. Each organization you need to access requires its own token.
+5. Create an environmental variable `GITHUB_ORG_TOKENS_MAP` which is a JSON string mapping organization names to environment variable names. For example:
+`GITHUB_ORG_TOKENS_MAP={"Org1": "GITHUB_TOKEN_ORG1", "Org2": "GITHUB_TOKEN_ORG2"}`
+
+You can optionally set
+1. `SQLITE_PATH` which is the path where the SQLite database will be created.
+2. `START_DATE` and `END_DATE` to define the date range for which to calculate lead time metrics, using ISO date strings (YYYY-MM-DD).
+
+Here is a complete examples which you can put in a ".env" file:
+
+```
+GITHUB_TOKEN_ORG1=your_personal_access_token_for_org1
+GITHUB_TOKEN_ORG2=your_personal_access_token_for_org2
+GITHUB_ORG_TOKENS_MAP={"Org1": "GITHUB_TOKEN_ORG1", "Org2": "GITHUB_TOKEN_ORG2"}
+ATLASSIAN_TOKEN=your_atlassian_api_token
+JIRA_INSTANCE=your_company.atlassian.net
+EMAIL=your_email@your_company.com
+SQLITE_PATH=./releases.db
+START_DATE=2023-01-01
+END_DATE=2023-12-31
+```
+
+Then run code similar to the following to generate a lead time report:
+
 ```python
 from datetime import date
 from dora_lead_time.lead_time_report import LeadTimeReport
