@@ -1,1 +1,1 @@
-"""Test package for DORA Lead Time Metrics."""
+"""Tests package for the dora_lead_time module."""
