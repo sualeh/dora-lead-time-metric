@@ -1,66 +1,34 @@
 # DORA Lead Time Metric
 
-A Python tool to calculate DORA (DevOps Research and Assessment) lead time metrics.
+## Lead Time for Changes
 
-## Installation
+Lead Time for Changes is one of the four key DORA (DevOps Research and Assessment) metrics that measure software delivery performance. It measures the time it takes from when code is committed to when it is successfully running in production. A shorter lead time indicates an organization's ability to respond quickly to customer needs and fix problems rapidly.
 
-### Using Poetry
-```bash
-poetry install
-```
+Typical lead time ranges:
 
-### Using pip
-```bash
-pip install dora-lead-time-metric
-```
+- Elite performers: Less than one hour
+- High performers: Between one day and one week
+- Medium performers: Between one week and one month
+- Low performers: Between one month and six months
 
-## Usage
+These tools help calculate lead time by tracking pull request timestamps from creation to merge, which is one component of the overall lead time metric.
 
-```python
-from datetime import datetime
-from dora_lead_time.main import LeadTimeCalculator
 
-# Sample deployment data
-deployments = [
-    {
-        "commit_time": datetime(2023, 1, 1, 10, 0),
-        "deployment_time": datetime(2023, 1, 1, 14, 0),
-        "commit_id": "abc123",
-        "environment": "production"
-    }
-]
+## Environment Configuration
 
-calculator = LeadTimeCalculator()
-results = calculator.process_deployments(deployments)
+The application requires several environment variables to be set in a `.env` file:
 
-print(f"Average Lead Time: {results['average_lead_time']}")
-```
+### GitHub Configuration
 
-## Development
 
-### Setup
-```bash
-poetry install
-```
+### Atlassian Configuration
+- `ATLASSIAN_TOKEN`: API token for Atlassian/Jira access
+  - Generate from Atlassian Account Settings → Security → API tokens
+  - Used for retrieving Jira ticket information
 
-### Running Tests
-```bash
-poetry run pytest
-```
+- `JIRA_INSTANCE`: Your Jira instance URL (e.g., `company.atlassian.net`)
+  - This is the domain portion of your Jira URL
 
-### Running with Coverage
-```bash
-poetry run pytest --cov=dora_lead_time tests/
-```
-
-## Docker
-
-Build the Docker image:
-```bash
-docker build -t dora-lead-time-metric .
-```
-
-Run the container:
-```bash
-docker run dora-lead-time-metric
-```
+- `EMAIL`: Your Atlassian account email address
+  - Required for Jira API authentication
+  - Should match the email associated with your Atlassian account
