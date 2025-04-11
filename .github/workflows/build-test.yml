@@ -58,6 +58,7 @@ jobs:
           --format markdown \
           --output coverage.md \
           coverage.xml
+        cat coverage.md >> $GITHUB_STEP_SUMMARY
         echo "Tests completed successfully"
 
     - id: upload-coverage-report
