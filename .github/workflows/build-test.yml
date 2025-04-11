@@ -35,6 +35,7 @@ jobs:
 
     - id: check-compilation
       name: Check code compilation
+      shell: bash
       run: |
         echo "Checking Python syntax..."
         poetry run python -m compileall -q .
@@ -42,9 +43,21 @@ jobs:
 
     - id: run-tests
       name: Run tests with coverage
+      shell: bash
       run: |
         echo "Running tests with coverage..."
-        poetry run pytest --cov=. --cov-report=term --cov-report=xml --cov-report=html
+        poetry run pytest \
+          --cov=dora_lead_time tests/ \
+          --cov-report=term \
+          --cov-report=xml \
+          --cov-report=lcov \
+          --cov-report=html:coverage.html \
+          --cov-report=annotate:coverage.annotate
+        pip install pycobertura
+        pycobertura show \
+          --format markdown \
+          --output coverage.md \
+          coverage.xml
         echo "Tests completed successfully"
 
     - id: upload-coverage-report
@@ -53,6 +66,9 @@ jobs:
       with:
         name: coverage-report
         path: |
+          coverage.md
           coverage.xml
-          htmlcov/
+          coverage.lcov
+          coverage.html/
+          coverage.annotate/
         if-no-files-found: warn
