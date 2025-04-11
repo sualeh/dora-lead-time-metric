@@ -41,8 +41,18 @@ jobs:
         echo "Python syntax check completed successfully"
 
     - id: run-tests
-      name: Run tests
+      name: Run tests with coverage
       run: |
-        echo "Running tests..."
-        poetry run pytest
+        echo "Running tests with coverage..."
+        poetry run pytest --cov=. --cov-report=term --cov-report=xml --cov-report=html
         echo "Tests completed successfully"
+
+    - id: upload-coverage-report
+      name: Upload coverage report
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-report
+        path: |
+          coverage.xml
+          htmlcov/
+        if-no-files-found: warn
