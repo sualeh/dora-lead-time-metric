@@ -47,6 +47,13 @@ jobs:
         poetry run pytest --cov=. --cov-report=term --cov-report=xml --cov-report=html
         echo "Tests completed successfully"
 
+    - id: get-coverage
+      name: Show coverage report
+      uses: orgoro/coverage@v3.2
+      with:
+          coverageFile: coverage.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+
     - id: upload-coverage-report
       name: Upload coverage report
       uses: actions/upload-artifact@v4
