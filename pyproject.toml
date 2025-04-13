@@ -1,24 +1,30 @@
 [tool.poetry]
+requires-poetry = ">=2.0,<3.0"
+
+[project]
 name = "dora-lead-time-metric"
-version = "0.2.0"
 description = "A tool to calculate the DORA Lead Time metric"
-authors = ["Sualeh Fatehi <sualeh@hotmail.com>"]
+version = "0.2.0"
 readme = "README.md"
-packages = [
-    { include = "dora_lead_time" }
+requires-python = ">=3.13,<4.0"
+dependencies = [
+    "python-dotenv (>=1.1.0,<2.0.0)",
+    "requests (>=2.32.3,<3.0.0)",
+    "matplotlib (>=3.10.0,<4.0.0)",
+    "numpy (>=2.2.3,<3.0.0)",
+    "pandas (>=2.2.3,<3.0.0)",
 ]
+
+[[tool.poetry.packages]]
+include = "dora_lead_time"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.poetry.dependencies]
-python = ">=3.13,<4.0"
-python-dotenv = ">=1.1.0,<2.0.0"
-requests = "^2.32.3"
-matplotlib = "^3.10.0"
-numpy = "^2.2.3"
-pandas = "^2.2.3"
+[[project.authors]]
+name = "Sualeh Fatehi"
+email = "sualeh@hotmail.com"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
@@ -31,6 +37,5 @@ python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
 
-[tool.poetry.scripts]
+[project.scripts]
 dora-lead-time-metric = "dora_lead_time.main:main"
-
