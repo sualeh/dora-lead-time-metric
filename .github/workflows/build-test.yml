@@ -31,7 +31,9 @@ jobs:
 
     - id: install-dependencies
       name: Install dependencies
-      run: poetry install --extras "dev"
+      shell: bash
+      run: |
+        poetry install --extras "dev"
 
     - id: check-compilation
       name: Check code compilation
