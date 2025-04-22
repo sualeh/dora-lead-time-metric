@@ -30,6 +30,10 @@ dev = [
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
+# Required since the package name is not the same as the module name
+[[tool.poetry.packages]]
+include = "dora_lead_time"
+
 [project.scripts]
 dora-lead-time-metric = "dora_lead_time.main:main"
 
