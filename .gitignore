@@ -1,5 +1,4 @@
 key.txt
-.env
 .env.params
 *.db
 
