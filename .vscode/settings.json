@@ -36,7 +36,7 @@
   "notebook.output.scrolling": true,
   "notebook.output.wordWrap": true,
   "python.testing.pytestArgs": [
-    "."
+    "tests"
   ],
   "python.testing.pytestEnabled": true,
   "python.testing.unittestEnabled": false,
