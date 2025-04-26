@@ -20,21 +20,22 @@ logger = logging.getLogger(__name__)
 
 
 class LeadTimeResult(NamedTuple):
-    """
-    LeadTimeResult is a NamedTuple that represents the result of a lead time
-    calculation.
+    """Result of a lead time calculation for a specific time period.
+
+    Represents the aggregated lead time metrics for a set of projects
+    over a specified time period.
 
     Attributes:
-        average_lead_time (float): The average lead time for the
+        project_keys: A list of project keys for which the calculation
+            was performed.
+        start_date: The start date of the period for which lead time
+            was calculated.
+        end_date: The end date of the period for which lead time
+            was calculated.
+        average_lead_time: The average lead time (in days) for the
             specified period.
-        number_of_releases (int): The total number of releases
-            during the specified period.
-        project_keys (list[str]): A list of project keys associated
-            with the calculation.
-        start_date (date): The start date of the period for which
-            lead time is calculated.
-        end_date (date): The end date of the period for which
-            lead time is calculated.
+        number_of_releases: The total number of releases during the
+            specified period.
     """
 
     project_keys: list[str]
@@ -46,14 +47,23 @@ class LeadTimeResult(NamedTuple):
 
 
 class LeadTimeReport:
-    """Methods to calculate lead time for project releases."""
+    """Lead time calculation and reporting for DORA metrics.
+
+    Provides methods to calculate and visualize lead time metrics for
+    project releases according to the DORA (DevOps Research and Assessment)
+    methodology.
+
+    Attributes:
+        sqlite_path: Path to the SQLite database file containing release data.
+    """
 
     def __init__(self, sqlite_path=None):
-        """Initialize the database processor with database path.
+        """Initialize the report generator with database path.
 
         Args:
-            sqlite_path (str, optional): Path to SQLite database file.
-                Defaults to the value set in constructor.
+            sqlite_path: Path to SQLite database file.
+                Defaults to the value from the SQLITE_PATH
+                environment variable.
         """
         load_dotenv()
         self.sqlite_path = sqlite_path or os.getenv("SQLITE_PATH")
@@ -63,12 +73,12 @@ class LeadTimeReport:
     def _get_connection(self):
         """Get a SQLite connection with proper type handling.
 
-        Args:
-            sqlite_path (str, optional): Path to SQLite database file.
-                Defaults to the value set in constructor.
+        Creates a connection to the SQLite database with appropriate type
+        converters for dates and timestamps.
 
         Returns:
-            sqlite3.Connection: A connection to the SQLite database
+            sqlite3.Connection: A connection to the SQLite database with
+            properly configured type handling.
         """
         sqlite_path = self.sqlite_path
 
@@ -97,18 +107,22 @@ class LeadTimeReport:
     def calculate_lead_time(
         self, project_keys: list[str], start_date: date, end_date: date
     ) -> LeadTimeResult:
-        """
-        Calculates lead time for project releases between two dates for
-            specified projects.
+        """Calculate lead time for project releases between two dates.
+
+        Calculates the average lead time and number of releases for the
+        specified projects within the given date range.
 
         Args:
-            sqlite_path: Path to SQLite database
-            project_keys: List of project keys (e.g. ['PROJ', 'TEST'])
-            start_date: Start date
-            end_date: End date
+            project_keys: List of project keys to include (e.g., ['PR', 'TS']).
+            start_date: Start date for the time period (inclusive).
+            end_date: End date for the time period (inclusive).
 
         Returns:
-            A named tuple containing lead time calculation results
+            A LeadTimeResult named tuple containing the average lead time,
+            number of releases, and input parameters.
+
+        Raises:
+            sqlite3.Error: If there's an error querying the database.
         """
         conn = None
         try:
@@ -169,15 +183,19 @@ class LeadTimeReport:
     def monthly_lead_time_report(
         self, project_keys: list[str], start_date: date, end_date: date
     ) -> DataFrame:
-        """Generates and displays a lead time report for the given projects.
+        """Generate a monthly lead time report for the given projects.
 
-        The report includes an overall summary of lead time
-        and a monthly trend visualization.
+        Creates a report with monthly lead time metrics for the specified
+        projects within the given date range.
 
         Args:
-            project_keys: List of project keys to include in the report
-            start_date: Start date for the report period
-            end_date: End date for the report period
+            project_keys: List of project keys to include in the report.
+            start_date: Start date for the report period (inclusive).
+            end_date: End date for the report period (inclusive).
+
+        Returns:
+            A pandas DataFrame with columns for Month, Lead Time, and Releases,
+            containing the monthly metrics for the specified time period.
         """
 
         month_names = []
@@ -207,13 +225,21 @@ class LeadTimeReport:
         df: pd.DataFrame,
         title: str = "",
         show_trend: bool = False,
-    ) -> None:
-        """Displays a plot of lead time data.
+    ) -> plt.Figure:
+        """Create a plot of lead time data.
+
+        Generates a matplotlib plot visualization of the lead time data,
+        optionally including trend lines.
 
         Args:
-            df: A pandas DataFrame with X-acis column and
-                at least one data column
-            show_trend: Whether to display trend lines for each series
+            df: A pandas DataFrame with at least one column for the x-axis
+                (typically "Month") and one or more data series columns.
+            title: Optional title for the plot. Defaults to empty string.
+            show_trend: Whether to display trend lines for each series.
+                Defaults to False.
+
+        Returns:
+            A matplotlib Figure object representing the plot.
         """
         colors = ["blue", "cyan", "red", "pink"]
 

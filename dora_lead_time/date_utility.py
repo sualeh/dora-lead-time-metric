@@ -1,4 +1,4 @@
-"""Do date operations for charts."""
+"""Utility functions for date operations used in charts and reports."""
 
 from datetime import date, timedelta
 from collections import namedtuple
@@ -14,23 +14,26 @@ MonthBoundary = namedtuple(
 )
 
 
+
 class DateUtility:
-    """Do date operations for charts."""
+    """Utility class for date operations used in charts and reports."""
 
     @staticmethod
     def get_months_between(
         start_date: date, end_date: date
     ) -> list[YearMonth]:
-        """
-        Returns a list of YearMonth between start_date
-        and end_date, inclusive.
+        """Get a list of months between two dates, inclusive.
+
+        Generates all year-month pairs between the given dates.
 
         Args:
-            start_date: The starting date
-            end_date: The ending date
+            start_date: The starting date.
+            end_date: The ending date.
 
         Returns:
-            A list of YearMonth named tuples with 'year' and 'month' attributes
+            A list of YearMonth named tuples with 'year' and 'month'
+            attributes, representing all months between and including
+            the start and end dates.
         """
         months = []
 
@@ -58,19 +61,18 @@ class DateUtility:
 
     @staticmethod
     def get_month_start_end(year: int, month: int) -> MonthBoundary:
-        """
-        Get the start and end dates for a given year and month.
+        """Get the start and end dates for a specific month.
+
+        This method handles the correct determination of the last day of the
+        month, accounting for varying month lengths and leap years.
 
         Args:
-            year: The year as an integer
-            month: The month as an integer (1-12)
+            year: The year as an integer.
+            month: The month as an integer (1-12).
 
         Returns:
-            A MonthBoundary named tuple with attributes:
-            - year: the input year
-            - month: the input month
-            - start_date: the first day of the month
-            - end_date: the last day of the month
+            A MonthBoundary named tuple containing the year, month, first day
+            of the month, and last day of the month.
         """
         # Start date: first day of the month
         start_date = date(year, month, 1)
