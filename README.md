@@ -1,3 +1,4 @@
+[![Build and Test](https://github.com/sualeh/dora-lead-time-metric/actions/workflows/build-test.yml/badge.svg)](https://github.com/sualeh/dora-lead-time-metric/actions/workflows/build-test.yml)
 [![PyPI Downloads](https://img.shields.io/pypi/dm/dora-lead-time-metric)](https://pypi.org/project/dora-lead-time-metric/)
 
 # DORA Lead Time Metric
