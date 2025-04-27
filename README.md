@@ -1,3 +1,5 @@
+[![PyPI Downloads](https://img.shields.io/pypi/dm/dora-lead-time-metric)](https://pypi.org/project/dora-lead-time-metric/)
+
 # DORA Lead Time Metric
 
 ## DORA Lead Time for Changes
