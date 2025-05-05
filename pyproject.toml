@@ -41,10 +41,10 @@ dora-lead-time-metric = "dora_lead_time.main:main"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
-addopts = "--cov=local_dir_rag --cov-report=term-missing"
+addopts = "--cov=dora_lead_time --cov-report=term-missing"
 
 [tool.coverage.run]
-source = ["local_dir_rag"]
+source = ["dora_lead_time"]
 omit = ["*/__init__.py"]
 
 [tool.coverage.report]
