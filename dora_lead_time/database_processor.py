@@ -326,20 +326,20 @@ class DatabaseProcessor:
                 """
                 INSERT OR IGNORE INTO releases
                 (
-                release_internal_id,
-                release_title,
-                release_description,
-                release_date,
-                project_id
+                    release_internal_id,
+                    release_title,
+                    release_description,
+                    release_date,
+                    project_id
                 )
                 SELECT
-                stage_releases.release_internal_id,
-                stage_releases.release_title,
-                stage_releases.release_description,
-                stage_releases.release_date,
-                projects.id as project_id
+                    stage_releases.release_internal_id,
+                    stage_releases.release_title,
+                    stage_releases.release_description,
+                    stage_releases.release_date,
+                    projects.id as project_id
                 FROM
-                stage_releases
+                    stage_releases
                 JOIN projects
                     ON stage_releases.project_key = projects.project_key
                 """
@@ -396,7 +396,7 @@ class DatabaseProcessor:
                 FROM
                     releases
                     LEFT JOIN stories
-                    ON releases.id = stories.release_id
+                        ON releases.id = stories.release_id
                 WHERE
                     stories.release_id IS NULL
                 """
@@ -458,12 +458,12 @@ class DatabaseProcessor:
             cursor.executemany(
                 """
                 INSERT INTO stage_stories (
-                story_key,
-                story_title,
-                story_type,
-                story_created,
-                story_resolved,
-                release_internal_id
+                    story_key,
+                    story_title,
+                    story_type,
+                    story_created,
+                    story_resolved,
+                    release_internal_id
                 )
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
@@ -475,22 +475,22 @@ class DatabaseProcessor:
                 """
                 INSERT INTO stories
                 (
-                story_key,
-                story_title,
-                story_type,
-                story_created,
-                story_resolved,
-                release_id
+                    story_key,
+                    story_title,
+                    story_type,
+                    story_created,
+                    story_resolved,
+                    release_id
                 )
                 SELECT
-                stage_stories.story_key,
-                stage_stories.story_title,
-                stage_stories.story_type,
-                stage_stories.story_created,
-                stage_stories.story_resolved,
-                releases.id AS release_id
+                    stage_stories.story_key,
+                    stage_stories.story_title,
+                    stage_stories.story_type,
+                    stage_stories.story_created,
+                    stage_stories.story_resolved,
+                    releases.id AS release_id
                 FROM
-                stage_stories
+                    stage_stories
                 JOIN releases
                     ON stage_stories.release_internal_id = releases.release_internal_id
                 """
@@ -667,18 +667,18 @@ class DatabaseProcessor:
                   pr_id
                 )
                 SELECT
-                  stories.id,
-                  pull_requests.id
+                    stories.id,
+                    pull_requests.id
                 FROM
-                  stage_stories_pull_requests
-                  JOIN stories
-                    ON stage_stories_pull_requests.story_key = stories.story_key
-                  JOIN pull_requests
-                    ON (
-                      stage_stories_pull_requests.pr_owner = pull_requests.pr_owner
-                      AND stage_stories_pull_requests.pr_repository = pull_requests.pr_repository
-                      AND stage_stories_pull_requests.pr_number = pull_requests.pr_number
-                    )
+                    stage_stories_pull_requests
+                    JOIN stories
+                        ON stage_stories_pull_requests.story_key = stories.story_key
+                    JOIN pull_requests
+                        ON (
+                            stage_stories_pull_requests.pr_owner = pull_requests.pr_owner
+                            AND stage_stories_pull_requests.pr_repository = pull_requests.pr_repository
+                            AND stage_stories_pull_requests.pr_number = pull_requests.pr_number
+                        )
                 """
             )
             logger.info("Inserted %d PRs for stories", cursor.rowcount)
@@ -820,7 +820,7 @@ class DatabaseProcessor:
                     commit_count = ?,
                     earliest_commit_date = ?,
                     latest_commit_date = ?
-                    WHERE
+                WHERE
                     id = ?
                 """,
                 [(
