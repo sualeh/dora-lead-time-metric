@@ -473,7 +473,7 @@ class DatabaseProcessor:
 
             cursor.execute(
                 """
-                INSERT INTO stories
+                INSERT OR IGNORE INTO stories
                 (
                     story_key,
                     story_title,
@@ -662,7 +662,7 @@ class DatabaseProcessor:
             # Insert into to PR mapping table
             cursor.execute(
                 """
-                INSERT INTO stories_pull_requests(
+                INSERT OR IGNORE INTO stories_pull_requests(
 				  story_id,
                   pr_id
                 )
