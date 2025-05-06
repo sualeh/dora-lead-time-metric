@@ -216,6 +216,20 @@ class OutlierReports:
         sql = self._read_sql_file("E_stories_without_pull_requests")
         return self.execute_query(sql)
 
+    def report_pull_requests_with_old_commits(self) -> pd.DataFrame:
+        """Get pull requests with significantly old commits.
+
+        Identifies pull requests where the earliest commit is much older
+        than the PR open date, which could indicate long-lived branches or
+        code that sat unmerged for extended periods.
+
+        Returns:
+            DataFrame with pull requests where commits are significantly older
+            than the PR creation date, ordered by the age difference.
+        """
+        sql = self._read_sql_file("F_pull_requests_with_old_commits")
+        return self.execute_query(sql)
+
 
 def main():
     """Main entry point of the application."""
