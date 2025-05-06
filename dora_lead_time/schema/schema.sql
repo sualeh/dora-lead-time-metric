@@ -101,3 +101,31 @@ FROM
 	ON stories_pull_requests.story_id = stories.id
 	JOIN pull_requests
 	ON stories_pull_requests.pr_id = pull_requests.id;
+
+DROP VIEW IF EXISTS summary;
+
+CREATE VIEW summary AS
+SELECT
+  'releases' AS type,
+  COUNT(*) AS count,
+  MIN(strftime('%Y-%m-%d', created_at)) AS earliest_date,
+  NULL AS latest_date
+FROM
+  releases
+UNION
+SELECT
+  'stories' AS type,
+  COUNT(*) AS count,
+  MIN(strftime('%Y-%m-%d', story_created)) AS earliest_date,
+  MAX(strftime('%Y-%m-%d', story_resolved)) AS latest_date
+FROM
+  stories
+UNION
+SELECT
+  'pull_requests' AS type,
+  COUNT(*) AS count,
+  MIN(pr_open) AS earliest_date,
+  MAX(pr_close) AS latest_date
+FROM
+  pull_requests
+;

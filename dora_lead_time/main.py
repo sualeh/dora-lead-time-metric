@@ -40,6 +40,7 @@ def create_releases_database(
     # Step 1: Create schema
     logger.info("-- 1. Creating releases database schema")
     db_processor.create_schema()
+    db_processor.print_summary()
 
     # Step 2: Get and save projects
     logger.info("-- 2. Getting projects from Atlassian Jira")
@@ -101,6 +102,7 @@ def create_releases_database(
             break
 
     logger.info("-- 7. Release database creation completed successfully")
+    db_processor.print_summary()
 
 
 def main():

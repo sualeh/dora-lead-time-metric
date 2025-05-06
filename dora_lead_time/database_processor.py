@@ -876,6 +876,64 @@ class DatabaseProcessor:
         logger.debug("Retrieved %d projects", len(projects_dict))
         return projects_dict
 
+    def print_summary(self):
+        """Print summary data from the database.
+
+        Displays statistics for releases, stories, and pull requests including:
+        - Total count for each entity
+        - Date ranges (earliest/ latest)
+
+        Raises:
+            Exception: If there's an error querying the database
+        """
+        conn = None
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute(
+                """
+                SELECT
+                    type,
+                    count,
+                    earliest_date,
+                    latest_date
+                FROM
+                    summary
+                """
+            )
+
+            rows = cursor.fetchall()
+
+            if not rows:
+                logger.info("No summary data available in the database")
+                return
+
+            logger.info("Database Summary:")
+            for row in rows:
+                entity_type = row[0]
+                count = row[1]
+                earliest_date = row[2] or "N/A"
+                latest_date = row[3]
+
+                date_range = (
+                    f"from {earliest_date} to {latest_date}"
+                    if latest_date else f"since {earliest_date}"
+                )
+
+                logger.info(
+                    "  %s: %d entries %s",
+                    entity_type,
+                    count,
+                    date_range
+                )
+
+        except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+            logger.error("Failed to retrieve summary data: %s", e)
+        finally:
+            if conn:
+                conn.close()
+
 
 def main():
     """Main entry point of the application."""
