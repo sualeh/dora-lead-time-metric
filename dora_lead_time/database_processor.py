@@ -909,24 +909,19 @@ class DatabaseProcessor:
                 logger.info("No summary data available in the database")
                 return
 
-            logger.info("Database Summary:")
+            summary_lines = ["Data summary:"]
             for row in rows:
                 entity_type = row[0]
                 count = row[1]
                 earliest_date = row[2] or "N/A"
                 latest_date = row[3]
 
-                date_range = (
-                    f"from {earliest_date} to {latest_date}"
-                    if latest_date else f"since {earliest_date}"
+                summary_lines.append(
+                    f"- {entity_type}: {count} entries"
+                    f" from {earliest_date} to {latest_date}"
                 )
 
-                logger.info(
-                    "  %s: %d entries %s",
-                    entity_type,
-                    count,
-                    date_range
-                )
+            logger.info("\n".join(summary_lines))
 
         except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
             logger.error("Failed to retrieve summary data: %s", e)

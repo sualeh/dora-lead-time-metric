@@ -109,7 +109,7 @@ SELECT
   'releases' AS type,
   COUNT(*) AS count,
   MIN(strftime('%Y-%m-%d', created_at)) AS earliest_date,
-  NULL AS latest_date
+  MAX(strftime('%Y-%m-%d', created_at)) AS latest_date
 FROM
   releases
 UNION
