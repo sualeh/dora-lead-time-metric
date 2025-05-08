@@ -1,6 +1,7 @@
 key.txt
 .env.params
 *.db
+.env
 
 poetry.lock
 

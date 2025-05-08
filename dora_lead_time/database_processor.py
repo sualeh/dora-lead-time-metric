@@ -914,10 +914,10 @@ class DatabaseProcessor:
                 entity_type = row[0]
                 count = row[1]
                 earliest_date = row[2] or "N/A"
-                latest_date = row[3]
+                latest_date = row[3] or "N/A"
 
                 summary_lines.append(
-                    f"- {entity_type}: {count} entries"
+                    f"    - {entity_type}: {count} entries"
                     f" from {earliest_date} to {latest_date}"
                 )
 
