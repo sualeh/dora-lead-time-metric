@@ -30,17 +30,23 @@ class DatabaseProcessor:
         if not self.sqlite_path:
             logger.info("SQLite location not set")
 
-    def _get_connection(self):
+    def _get_connection(self, check_exists=True):
         """Get a SQLite connection with proper type handling.
 
         Args:
-            sqlite_path (str, optional): Path to SQLite database file.
-                Defaults to the value set in constructor.
+            check_exists (bool, optional): If True, checks if the database file exists
+                before connecting. Defaults to True.
 
         Returns:
             sqlite3.Connection: A connection to the SQLite database
+
+        Raises:
+            FileNotFoundError: If the database file does not exist and check_exists is True
         """
         sqlite_path = self.sqlite_path
+
+        if check_exists and not os.path.exists(sqlite_path):
+            raise FileNotFoundError(f"Database file does not exist: {sqlite_path}")
 
         # Register adapters for Python objects to SQLite types
         sqlite3.register_adapter(date, lambda val: val.isoformat())
@@ -135,9 +141,7 @@ class DatabaseProcessor:
         1. Projects contain releases
         2. Releases contain stories
         3. Stories are associated with pull requests
-        4. Pull requests contain commit information
-
-        Args:
+        4. Pull requests contain commit information        Args:
             sqlite_path (str, optional): Path to SQLite database file.
                 Defaults to the value set in constructor.
 
@@ -146,7 +150,8 @@ class DatabaseProcessor:
         """
         conn = None
         try:
-            conn = self._get_connection()
+            # When creating a schema, we don't want to check if the database exists
+            conn = self._get_connection(check_exists=False)
             cursor = conn.cursor()
 
             schema_dir = pathlib.Path(__file__).parent / "schema"
@@ -900,6 +905,8 @@ class DatabaseProcessor:
                     latest_date
                 FROM
                     summary
+                ORDER BY
+                    id
                 """
             )
 
@@ -911,13 +918,10 @@ class DatabaseProcessor:
 
             summary_lines = ["Data summary:"]
             for row in rows:
-                entity_type = row[0]
-                count = row[1]
-                earliest_date = row[2] or "N/A"
-                latest_date = row[3] or "N/A"
-
+                entity_type, count, earliest_date, latest_date = row
                 summary_lines.append(
-                    f"    - {entity_type}: {count} entries"
+                    f"    - {'{:5,}'.format(count)}"
+                    f" {'{:15}'.format(entity_type)}"
                     f" from {earliest_date} to {latest_date}"
                 )
 

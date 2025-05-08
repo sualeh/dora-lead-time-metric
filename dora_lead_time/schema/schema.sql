@@ -106,6 +106,7 @@ DROP VIEW IF EXISTS summary;
 
 CREATE VIEW summary AS
 SELECT
+  1 as id,
   'releases' AS type,
   COUNT(*) AS count,
   MIN(strftime('%Y-%m-%d', created_at)) AS earliest_date,
@@ -114,6 +115,7 @@ FROM
   releases
 UNION
 SELECT
+  2 as id,
   'stories' AS type,
   COUNT(*) AS count,
   MIN(strftime('%Y-%m-%d', story_created)) AS earliest_date,
@@ -122,6 +124,7 @@ FROM
   stories
 UNION
 SELECT
+  3 as id,
   'pull_requests' AS type,
   COUNT(*) AS count,
   MIN(pr_open) AS earliest_date,

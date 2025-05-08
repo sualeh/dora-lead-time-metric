@@ -2,6 +2,7 @@
 
 import logging
 import os
+import textwrap
 from datetime import date, datetime
 from typing import Dict, List
 
@@ -264,12 +265,12 @@ class AtlassianRequests:
             # Move to next batch
             start_at += len(data["issues"])
             logger.info(
-                """
-                Retrieved %d stories, for batch starting at %d
-                (Story counts may not match if they are part of
-                more than one release)
-                Total stories retrieved: %d
-                """,
+                textwrap.dedent("""
+                    Retrieved %d stories, for batch starting at %d
+                    (Story counts may not match if they are part of
+                    more than one release)
+                    Total stories retrieved: %d
+                """).strip(),
                 len(data["issues"]),
                 start_at,
                 len(all_stories)

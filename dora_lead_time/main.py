@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_releases_database(
+        build_database: bool,
         start_date: date,
         end_date: date,
         org_to_env_var_map: dict[str, str]
@@ -36,6 +37,10 @@ def create_releases_database(
 
     # Initialize database processor
     db_processor = DatabaseProcessor()
+
+    if not build_database:
+        db_processor.print_summary()
+        return
 
     # Step 1: Create schema
     logger.info("-- 1. Creating releases database schema")
@@ -119,7 +124,11 @@ def main():
         logger.error("Invalid GITHUB_ORG_TOKENS_MAP format. Using empty map.")
         org_to_env_var_map = {}
 
+    build_database = (
+        os.getenv("BUILD_DATABASE", "False").strip().lower() == "true"
+    )
     create_releases_database(
+        build_database,
         date.fromisoformat(os.getenv("START_DATE")),
         date.fromisoformat(os.getenv("END_DATE")),
         org_to_env_var_map=org_to_env_var_map
