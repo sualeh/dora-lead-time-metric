@@ -254,8 +254,7 @@ def save_lead_time_charts(start_date: date, end_date: date):
                 0.5, 0.1,  # x, y position (centered, bottom)
                 lead_time_summary,
                 ha='center',  # horizontal alignment
-                fontsize=8,
-                style='italic'
+                fontsize=8
             )
             # Add extra space at the bottom for the footer
             plot.subplots_adjust(bottom=0.3)
@@ -268,7 +267,10 @@ def save_lead_time_charts(start_date: date, end_date: date):
             logger.info("Saved chart to %s", file_path)
             return True
         else:
-            logger.info("No lead time data for %s, skipping chart creation", title)
+            logger.info(
+                "No lead time data for %s, skipping chart creation",
+                title
+            )
             return False
 
     # Generate chart for each individual project
