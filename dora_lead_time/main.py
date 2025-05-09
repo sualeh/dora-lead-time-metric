@@ -12,7 +12,6 @@ from dora_lead_time.atlassian_requests import AtlassianRequests
 from dora_lead_time.github_requests import GitHubRequests
 from dora_lead_time.outlier_reports import OutlierReports
 from dora_lead_time.lead_time_report import LeadTimeReport
-import matplotlib.pyplot as plt
 
 logging.basicConfig(
     level=logging.INFO,
@@ -376,7 +375,10 @@ def main():
             date.fromisoformat(os.getenv("START_DATE")),
             date.fromisoformat(os.getenv("END_DATE"))
         )
-        logger.info("Lead time charts generated successfully in %s", charts_dir)
+        logger.info(
+            "Lead time charts generated successfully in %s",
+            charts_dir
+        )
 
 
 if __name__ == "__main__":
