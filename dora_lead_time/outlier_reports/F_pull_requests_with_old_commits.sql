@@ -3,7 +3,7 @@ SELECT
   stories.story_title,
   pull_requests.pr_title,
   CAST(julianday(pull_requests.pr_open) - julianday(pull_requests.earliest_commit_date) AS INTEGER) AS days_between,
-  pull_requests.earliest_commit_date AS commit_date,
+  pull_requests.earliest_commit_date,
   pull_requests.pr_open AS pr_created_date,
   pull_requests.pr_url
 FROM

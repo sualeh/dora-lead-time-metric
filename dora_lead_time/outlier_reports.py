@@ -40,7 +40,7 @@ class OutlierReports:
             logger.warning("SQLite location not set")
 
         # Create a directory for SQL files if it doesn't exist
-        sql_dir = pathlib.Path(__file__).parent / "outlier_reports_sql"
+        sql_dir = pathlib.Path(__file__).parent / "outlier_reports"
         sql_dir.mkdir(exist_ok=True)
         self.sql_dir = sql_dir
 

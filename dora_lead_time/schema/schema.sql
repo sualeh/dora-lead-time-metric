@@ -94,13 +94,13 @@ SELECT
 FROM
 	releases
 	JOIN projects
-	ON releases.project_id = projects.id
+	  ON releases.project_id = projects.id
 	JOIN stories
-	ON stories.release_id = releases.id
+	  ON stories.release_id = releases.id
 	JOIN stories_pull_requests
-	ON stories_pull_requests.story_id = stories.id
+	  ON stories_pull_requests.story_id = stories.id
 	JOIN pull_requests
-	ON stories_pull_requests.pr_id = pull_requests.id;
+	  ON stories_pull_requests.pr_id = pull_requests.id;
 
 DROP VIEW IF EXISTS summary;
 
