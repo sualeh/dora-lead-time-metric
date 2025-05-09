@@ -173,6 +173,155 @@ def save_outlier_reports():
     return str(reports_dir)
 
 
+def save_lead_time_charts(start_date: date, end_date: date):
+    """Generate and save lead time charts as PNG files.
+
+    Creates a new directory named "lead_times_yyyy-mm-dd-hh-mm-ss"
+    and saves lead time charts for each project, each project type,
+    and an overall chart.
+
+    Args:
+        start_date (date): Start date for lead time calculations (inclusive)
+        end_date (date): End date for lead time calculations (inclusive)
+
+    Returns:
+        str: Path to the created charts directory
+    """
+    logger.info("Generating and saving lead time charts")
+
+    # Create timestamp for directory name
+    timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    charts_dir = pathlib.Path(f"lead_times_{timestamp}")
+    charts_dir.mkdir(exist_ok=True)
+
+    logger.info("Created charts directory: %s", charts_dir)
+
+    # Initialize database processor and lead time report
+    from dora_lead_time.database_processor import DatabaseProcessor
+    from dora_lead_time.lead_time_report import LeadTimeReport
+    import matplotlib.pyplot as plt
+
+    db_processor = DatabaseProcessor()
+    lead_time_report = LeadTimeReport()
+
+    # Get all projects
+    all_projects = db_processor.retrieve_all_projects()
+
+    # Group projects by type
+    projects_by_type = {}
+    all_project_keys = []
+
+    for project in all_projects:
+        project_key = project.project_key
+        all_project_keys.append(project_key)
+
+        project_type = project.project_type or "unknown"
+        if project_type not in projects_by_type:
+            projects_by_type[project_type] = []
+
+        projects_by_type[project_type].append(project_key)
+
+    # Generate chart for each individual project
+    for project in all_projects:
+        project_key = project.project_key
+        project_title = project.project_title
+
+        logger.info("Generating chart for project: %s", project_key)
+
+        # Generate monthly lead time report
+        df = lead_time_report.monthly_lead_time_report(
+            [project_key], start_date, end_date
+        )
+
+        if not df.empty and df["Lead Time"].sum() > 0:
+            # Create plot
+            plot = lead_time_report.show_plot(
+                df,
+                title=f"Lead Time for {project_title} ({project_key})",
+                show_trend=True
+            )
+
+            # Save plot
+            file_path = charts_dir / f"project_{project_key}.png"
+            plot.savefig(file_path, bbox_inches="tight")
+            plt.close()  # Close plot to free memory
+
+            logger.info("Saved chart to %s", file_path)
+        else:
+            logger.info(
+                "No lead time data for project %s, skipping chart creation",
+                project_key
+            )
+
+    # Generate chart for each project type
+    for project_type, project_keys in projects_by_type.items():
+        if not project_keys:
+            continue
+
+        logger.info(
+            "Generating chart for project type: %s (%d projects)",
+            project_type,
+            len(project_keys)
+        )
+
+        # Generate monthly lead time report
+        df = lead_time_report.monthly_lead_time_report(
+            project_keys, start_date, end_date
+        )
+
+        if not df.empty and df["Lead Time"].sum() > 0:
+            # Create plot
+            plot = lead_time_report.show_plot(
+                df,
+                title=f"Lead Time for {project_type} Projects",
+                show_trend=True
+            )
+
+            # Save plot
+            file_path = charts_dir / f"type_{project_type}.png"
+            plot.savefig(file_path, bbox_inches="tight")
+            plt.close()  # Close plot to free memory
+
+            logger.info("Saved chart to %s", file_path)
+        else:
+            logger.info(
+                "No lead time data for project type %s, "
+                "skipping chart creation",
+                project_type
+            )
+
+    # Generate overall chart
+    logger.info("Generating overall lead time chart")
+
+    # Generate monthly lead time report for all projects
+    df = lead_time_report.monthly_lead_time_report(
+        all_project_keys, start_date, end_date
+    )
+
+    if not df.empty and df["Lead Time"].sum() > 0:
+        # Create plot
+        plot = lead_time_report.show_plot(
+            df,
+            title="Overall Lead Time",
+            show_trend=True
+        )
+
+        # Save plot
+        file_path = charts_dir / "overall.png"
+        plot.savefig(file_path, bbox_inches="tight")
+        plt.close()  # Close plot to free memory
+
+        logger.info("Saved overall chart to %s", file_path)
+    else:
+        logger.info(
+            "No lead time data available, "
+            "skipping overall chart creation"
+        )
+
+    logger.info("All charts saved to directory: %s", charts_dir)
+    return str(charts_dir)
+
+
 def main():
     """Main entry point of the application."""
     # Set up argument parser
@@ -189,6 +338,11 @@ def main():
         action="store_true",
         help="Generate outlier reports"
     )
+    parser.add_argument(
+        "--lead-time",
+        action="store_true",
+        help="Generate lead time charts"
+    )
     args = parser.parse_args()
 
     load_dotenv(dotenv_path=".env.params")
@@ -202,13 +356,14 @@ def main():
         logger.error("Invalid GITHUB_ORG_TOKENS_MAP format. Using empty map.")
         org_to_env_var_map = {}
 
-    # If no arguments are provided, build the database by default
-    if not args.build and not args.report:
-        build_database = True
-    else:
-        build_database = args.build
+    # If no arguments are provided, show help
+    if not args.build and not args.report and not args.lead_time:
+        parser.print_help()
+        return
 
-    # If build flag is set or no flags provided, create the database
+    build_database = args.build
+
+    # If build flag is set, create the database
     if build_database:
         create_releases_database(
             build_database,
@@ -221,6 +376,14 @@ def main():
     if args.report:
         reports_dir = save_outlier_reports()
         logger.info("Reports generated successfully in %s", reports_dir)
+
+    # Generate lead time charts if --lead-time flag is set
+    if args.lead_time:
+        charts_dir = save_lead_time_charts(
+            date.fromisoformat(os.getenv("START_DATE")),
+            date.fromisoformat(os.getenv("END_DATE"))
+        )
+        logger.info("Lead time charts generated successfully in %s", charts_dir)
 
 
 if __name__ == "__main__":

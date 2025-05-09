@@ -3,6 +3,7 @@ key.txt
 *.db
 .env
 outlier_reports_*/
+lead_times_*/
 poetry.lock
 
 # Created by https://www.toptal.com/developers/gitignore/api/dotenv,python,jupyternotebooks,visualstudiocode,pycharm
