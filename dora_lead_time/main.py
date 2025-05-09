@@ -218,47 +218,18 @@ def save_lead_time_charts(start_date: date, end_date: date):
 
         projects_by_type[project_type].append(project_key)
 
-    # Generate chart for each individual project
-    for project in all_projects:
-        project_key = project.project_key
-        project_title = project.project_title
+    def generate_and_save_chart(project_keys, title, filename):
+        """Generate and save a lead time chart.
 
-        logger.info("Generating chart for project: %s", project_key)
+        Args:
+            project_keys (list): List of project keys to include in the chart
+            title (str): Title for the chart
+            filename (str): Filename to save the chart (without extension)
 
-        # Generate monthly lead time report
-        df = lead_time_report.monthly_lead_time_report(
-            [project_key], start_date, end_date
-        )
-
-        if not df.empty and df["Lead Time"].sum() > 0:
-            # Create plot
-            plot = lead_time_report.show_plot(
-                df,
-                title=f"Lead Time for {project_title} ({project_key})"
-            )
-
-            # Save plot
-            file_path = charts_dir / f"project_{project_key}.png"
-            plot.savefig(file_path, bbox_inches="tight")
-            plt.close()  # Close plot to free memory
-
-            logger.info("Saved chart to %s", file_path)
-        else:
-            logger.info(
-                "No lead time data for project %s, skipping chart creation",
-                project_key
-            )
-
-    # Generate chart for each project type
-    for project_type, project_keys in projects_by_type.items():
-        if not project_keys:
-            continue
-
-        logger.info(
-            "Generating chart for project type: %s (%d projects)",
-            project_type,
-            len(project_keys)
-        )
+        Returns:
+            bool: True if chart was generated, False if no data
+        """
+        logger.info("Generating chart: %s", title)
 
         # Generate monthly lead time report
         df = lead_time_report.monthly_lead_time_report(
@@ -267,50 +238,48 @@ def save_lead_time_charts(start_date: date, end_date: date):
 
         if not df.empty and df["Lead Time"].sum() > 0:
             # Create plot
-            plot = lead_time_report.show_plot(
-                df,
-                title=f"Lead Time for {project_type} Projects"
-            )
+            plot = lead_time_report.show_plot(df, title=title)
 
             # Save plot
-            file_path = charts_dir / f"type_{project_type}.png"
+            file_path = charts_dir / f"{filename}.png"
             plot.savefig(file_path, bbox_inches="tight")
             plt.close()  # Close plot to free memory
 
             logger.info("Saved chart to %s", file_path)
+            return True
         else:
-            logger.info(
-                "No lead time data for project type %s, "
-                "skipping chart creation",
-                project_type
-            )
+            logger.info("No lead time data for %s, skipping chart creation", title)
+            return False
+
+    # Generate chart for each individual project
+    for project in all_projects:
+        project_key = project.project_key
+        project_title = project.project_title
+        title = f"Lead Time for {project_title} ({project_key})"
+        generate_and_save_chart(
+            [project_key],
+            title,
+            f"project_{project_key}"
+        )
+
+    # Generate chart for each project type
+    for project_type, project_keys in projects_by_type.items():
+        if not project_keys:
+            continue
+
+        title = f"Lead Time for {project_type.capitalize()} Projects"
+        generate_and_save_chart(
+            project_keys,
+            title,
+            f"type_{project_type}"
+        )
 
     # Generate overall chart
-    logger.info("Generating overall lead time chart")
-
-    # Generate monthly lead time report for all projects
-    df = lead_time_report.monthly_lead_time_report(
-        all_project_keys, start_date, end_date
+    generate_and_save_chart(
+        all_project_keys,
+        "Overall Lead Time",
+        "overall"
     )
-
-    if not df.empty and df["Lead Time"].sum() > 0:
-        # Create plot
-        plot = lead_time_report.show_plot(
-            df,
-            title="Overall Lead Time"
-        )
-
-        # Save plot
-        file_path = charts_dir / "overall.png"
-        plot.savefig(file_path, bbox_inches="tight")
-        plt.close()  # Close plot to free memory
-
-        logger.info("Saved overall chart to %s", file_path)
-    else:
-        logger.info(
-            "No lead time data available, "
-            "skipping overall chart creation"
-        )
 
     logger.info("All charts saved to directory: %s", charts_dir)
     return str(charts_dir)

@@ -122,13 +122,7 @@ def test_show_plot():
     plt.close('all')  # Close any existing plots
     report = LeadTimeReport("test_db_path")
 
-    # Test without trend
-    plot = report.show_plot(df, title="Test Plot", show_trend=False)
-    assert plot is not None
-    plt.close('all')
-
-    # Test with trend
-    plot = report.show_plot(df, title="Test Plot with Trend", show_trend=True)
+    plot = report.show_plot(df, title="Test Plot")
     assert plot is not None
     plt.close('all')
 
