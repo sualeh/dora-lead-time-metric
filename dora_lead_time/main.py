@@ -261,7 +261,13 @@ def save_lead_time_charts(start_date: date, end_date: date):
 
             # Save plot
             file_path = charts_dir / f"{filename}.png"
-            plot.savefig(file_path, bbox_inches="tight")
+            plot.savefig(
+                file_path,
+                dpi=600,
+                format="png",
+                bbox_inches="tight",
+                pad_inches=0.3
+            )
             plot.close()  # Close plot to free memory
 
             logger.info("Saved chart to %s", file_path)
