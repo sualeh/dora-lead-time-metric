@@ -223,8 +223,7 @@ class LeadTimeReport:
     def show_plot(
         self,
         df: pd.DataFrame,
-        title: str = "",
-        show_trend: bool = False,
+        title: str = ""
     ) -> plt.Figure:
         """Create a plot of lead time data.
 
@@ -264,12 +263,6 @@ class LeadTimeReport:
                 linestyle=linestyle, marker="o",
                 color=colors[idx]
             )
-
-            if show_trend:
-                # Fit a trend line
-                z = np.polyfit(x, y, 1)
-                p = np.poly1d(z)
-                plt.plot(x, p(x), linestyle="--")
 
         x = np.arange(len(df[xlabel]))
         plt.xticks(x, df[xlabel], rotation=45)

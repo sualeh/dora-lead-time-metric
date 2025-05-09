@@ -11,6 +11,8 @@ from dora_lead_time.database_processor import DatabaseProcessor
 from dora_lead_time.atlassian_requests import AtlassianRequests
 from dora_lead_time.github_requests import GitHubRequests
 from dora_lead_time.outlier_reports import OutlierReports
+from dora_lead_time.lead_time_report import LeadTimeReport
+import matplotlib.pyplot as plt
 
 logging.basicConfig(
     level=logging.INFO,
@@ -196,11 +198,6 @@ def save_lead_time_charts(start_date: date, end_date: date):
 
     logger.info("Created charts directory: %s", charts_dir)
 
-    # Initialize database processor and lead time report
-    from dora_lead_time.database_processor import DatabaseProcessor
-    from dora_lead_time.lead_time_report import LeadTimeReport
-    import matplotlib.pyplot as plt
-
     db_processor = DatabaseProcessor()
     lead_time_report = LeadTimeReport()
 
@@ -237,8 +234,7 @@ def save_lead_time_charts(start_date: date, end_date: date):
             # Create plot
             plot = lead_time_report.show_plot(
                 df,
-                title=f"Lead Time for {project_title} ({project_key})",
-                show_trend=True
+                title=f"Lead Time for {project_title} ({project_key})"
             )
 
             # Save plot
@@ -273,8 +269,7 @@ def save_lead_time_charts(start_date: date, end_date: date):
             # Create plot
             plot = lead_time_report.show_plot(
                 df,
-                title=f"Lead Time for {project_type} Projects",
-                show_trend=True
+                title=f"Lead Time for {project_type} Projects"
             )
 
             # Save plot
@@ -302,8 +297,7 @@ def save_lead_time_charts(start_date: date, end_date: date):
         # Create plot
         plot = lead_time_report.show_plot(
             df,
-            title="Overall Lead Time",
-            show_trend=True
+            title="Overall Lead Time"
         )
 
         # Save plot
