@@ -3,11 +3,14 @@
 import os
 import logging
 import json
-from datetime import date
+import argparse
+from datetime import date, datetime
+import pathlib
 from dotenv import load_dotenv
 from dora_lead_time.database_processor import DatabaseProcessor
 from dora_lead_time.atlassian_requests import AtlassianRequests
 from dora_lead_time.github_requests import GitHubRequests
+from dora_lead_time.outlier_reports import OutlierReports
 
 logging.basicConfig(
     level=logging.INFO,
@@ -25,8 +28,10 @@ def create_releases_database(
     """Coordinate the creation of the releases database.
 
     Args:
+        build_database (bool): Flag to determine whether to build the database
         start_date (date): Start date for release search (inclusive)
         end_date (date): End date for release search (inclusive)
+        org_to_env_var_map (dict[str, str]): Mapping from GitHub org to env var
     """
     logger.info(
         "Creating releases database between %s and %s", start_date, end_date
@@ -110,8 +115,81 @@ def create_releases_database(
     db_processor.print_summary()
 
 
+def save_outlier_reports():
+    """Save all outlier reports as CSV files.
+
+    Creates a new directory named "outlier_reports_yyyy-mm-dd-hh-mm-ss"
+    and saves each outlier report as a CSV file within this directory.
+
+    Returns:
+        str: Path to the created reports directory
+    """
+    logger.info("Generating and saving outlier reports")
+
+    # Create timestamp for directory name
+    timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    reports_dir = pathlib.Path(f"outlier_reports_{timestamp}")
+    reports_dir.mkdir(exist_ok=True)
+
+    logger.info("Created reports directory: %s", reports_dir)
+
+    # Initialize outlier reports
+    outlier_reports = OutlierReports()
+
+    # Dictionary mapping report functions to file names
+    report_mapping = {
+        "projects_without_releases":
+            outlier_reports.report_projects_without_releases,
+        "releases_with_open_stories":
+            outlier_reports.report_releases_with_open_stories,
+        "stories_in_multiple_releases":
+            outlier_reports.report_stories_in_multiple_releases,
+        "releases_with_open_pull_requests":
+            outlier_reports.report_releases_with_open_pull_requests,
+        "counts_of_stories_without_pull_requests":
+            outlier_reports.report_counts_of_stories_without_pull_requests,
+        "stories_without_pull_requests":
+            outlier_reports.report_stories_without_pull_requests,
+        "pull_requests_with_old_commits":
+            outlier_reports.report_pull_requests_with_old_commits
+    }
+
+    # Generate and save each report
+    for report_name, report_func in report_mapping.items():
+        logger.info("Generating report: %s", report_name)
+        df = report_func()
+
+        if not df.empty:
+            file_path = reports_dir / f"{report_name}.csv"
+            df.to_csv(file_path, index=False)
+            logger.info("Saved report to %s (%d rows)", file_path, len(df))
+        else:
+            logger.info(
+                "Report %s is empty, skipping CSV creation",
+                report_name
+            )
+
+    logger.info("All reports saved to directory: %s", reports_dir)
+    return str(reports_dir)
+
+
 def main():
     """Main entry point of the application."""
+    # Set up argument parser
+    parser = argparse.ArgumentParser(
+        description="DORA Lead Time Metrics"
+    )
+    parser.add_argument(
+        "--build",
+        action="store_true",
+        help="Build a new database"
+    )
+    parser.add_argument(
+        "--report",
+        action="store_true",
+        help="Generate outlier reports"
+    )
+    args = parser.parse_args()
 
     load_dotenv(dotenv_path=".env.params")
     load_dotenv()
@@ -124,15 +202,25 @@ def main():
         logger.error("Invalid GITHUB_ORG_TOKENS_MAP format. Using empty map.")
         org_to_env_var_map = {}
 
-    build_database = (
-        os.getenv("BUILD_DATABASE", "False").strip().lower() == "true"
-    )
-    create_releases_database(
-        build_database,
-        date.fromisoformat(os.getenv("START_DATE")),
-        date.fromisoformat(os.getenv("END_DATE")),
-        org_to_env_var_map=org_to_env_var_map
-    )
+    # If no arguments are provided, build the database by default
+    if not args.build and not args.report:
+        build_database = True
+    else:
+        build_database = args.build
+
+    # If build flag is set or no flags provided, create the database
+    if build_database:
+        create_releases_database(
+            build_database,
+            date.fromisoformat(os.getenv("START_DATE")),
+            date.fromisoformat(os.getenv("END_DATE")),
+            org_to_env_var_map=org_to_env_var_map
+        )
+
+    # Generate reports if --report flag is set
+    if args.report:
+        reports_dir = save_outlier_reports()
+        logger.info("Reports generated successfully in %s", reports_dir)
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@ key.txt
 .env.params
 *.db
 .env
-
+outlier_reports_*/
 poetry.lock
 
 # Created by https://www.toptal.com/developers/gitignore/api/dotenv,python,jupyternotebooks,visualstudiocode,pycharm
