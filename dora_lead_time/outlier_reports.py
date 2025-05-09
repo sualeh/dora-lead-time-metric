@@ -230,6 +230,20 @@ class OutlierReports:
         sql = self._read_sql_file("F_pull_requests_with_old_commits")
         return self.execute_query(sql)
 
+    def report_zero_or_negative_lead_times(self) -> pd.DataFrame:
+        """Get pull requests with zero or negative lead times.
+
+        Identifies pull requests where the lead time (time between first commit
+        and merge) is zero or negative, which indicates potential data quality
+        issues or timestamp problems.
+
+        Returns:
+            DataFrame with pull requests having zero or negative lead times,
+            ordered by lead time (ascending) and project key.
+        """
+        sql = self._read_sql_file("G_zero_or_negative_lead_times")
+        return self.execute_query(sql)
+
 
 def main():
     """Main entry point of the application."""

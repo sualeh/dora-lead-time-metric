@@ -153,7 +153,9 @@ def save_outlier_reports():
         "stories_without_pull_requests":
             outlier_reports.report_stories_without_pull_requests,
         "pull_requests_with_old_commits":
-            outlier_reports.report_pull_requests_with_old_commits
+            outlier_reports.report_pull_requests_with_old_commits,
+        "zero_or_negative_lead_times":
+            outlier_reports.report_zero_or_negative_lead_times
     }
 
     # Generate and save each report
