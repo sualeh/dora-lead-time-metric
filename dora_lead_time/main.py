@@ -231,6 +231,16 @@ def save_lead_time_charts(start_date: date, end_date: date):
         """
         logger.info("Generating chart: %s", title)
 
+        lead_time = lead_time_report.calculate_lead_time(
+            project_keys,
+            start_date,
+            end_date
+        )
+        lead_time_summary = \
+            "Lead time for changes is " \
+            f"{int(lead_time.average_lead_time)} days average " \
+            f"over {lead_time.number_of_releases} releases"
+
         # Generate monthly lead time report
         df = lead_time_report.monthly_lead_time_report(
             project_keys, start_date, end_date
@@ -239,11 +249,21 @@ def save_lead_time_charts(start_date: date, end_date: date):
         if not df.empty and df["Lead Time"].sum() > 0:
             # Create plot
             plot = lead_time_report.show_plot(df, title=title)
+            # Add footer with lead time summary
+            plot.figtext(
+                0.5, 0.1,  # x, y position (centered, bottom)
+                lead_time_summary,
+                ha='center',  # horizontal alignment
+                fontsize=8,
+                style='italic'
+            )
+            # Add extra space at the bottom for the footer
+            plot.subplots_adjust(bottom=0.3)
 
             # Save plot
             file_path = charts_dir / f"{filename}.png"
             plot.savefig(file_path, bbox_inches="tight")
-            plt.close()  # Close plot to free memory
+            plot.close()  # Close plot to free memory
 
             logger.info("Saved chart to %s", file_path)
             return True
