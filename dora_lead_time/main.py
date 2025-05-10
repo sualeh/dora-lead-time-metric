@@ -62,9 +62,9 @@ def load_lead_time_configuration() -> LeadTimeConfiguration:
         ) from exc
 
     # Get GitHub organization tokens map
-    org_tokens_json = os.getenv("GITHUB_ORG_TOKENS_MAP", "{}")
+    github_org_tokens_json = os.getenv("GITHUB_ORG_TOKENS_MAP", "{}")
     try:
-        github_org_tokens_map = json.loads(org_tokens_json)
+        github_org_tokens_map = json.loads(github_org_tokens_json)
     except json.JSONDecodeError as exc:
         raise ValueError(
             "Invalid GITHUB_ORG_TOKENS_MAP format"
@@ -98,7 +98,7 @@ def create_releases_database(config: LeadTimeConfiguration):
     )
     # Initialize clients
     atlassian_client = AtlassianRequests()
-    github_client = GitHubRequests(config.org_to_env_var_map)
+    github_client = GitHubRequests(config.github_org_tokens_map)
 
     # Initialize database processor
     db_processor = DatabaseProcessor(config.sqlite_path)
