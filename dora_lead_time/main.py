@@ -6,6 +6,7 @@ import json
 import argparse
 from datetime import date, datetime
 import pathlib
+from typing import NamedTuple
 from dotenv import load_dotenv
 from dora_lead_time.database_processor import DatabaseProcessor
 from dora_lead_time.atlassian_requests import AtlassianRequests
@@ -20,12 +21,68 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def create_releases_database(
-        build_database: bool,
-        start_date: date,
-        end_date: date,
-        org_to_env_var_map: dict[str, str]
-):
+class LeadTimeConfiguration(NamedTuple):
+    """Configuration for lead time analysis."""
+    sqlite_path: str
+    build_database: bool
+    start_date: date
+    end_date: date
+    github_org_tokens_map: dict[str, str]
+
+
+def load_lead_time_configuration() -> LeadTimeConfiguration:
+    """Load lead time configuration from environment variables.
+
+    Loads and validates configuration settings for lead time analysis from
+    environment variables, including database path, dates, and GitHub tokens.
+
+    Returns:
+        LeadTimeConfiguration: A named tuple containing the configuration
+            settings for lead time analysis.
+
+    Raises:
+        ValueError: If required environment variables are missing or invalid.
+    """
+
+    load_dotenv(dotenv_path=".env.params")
+    load_dotenv()
+
+    # Get database path
+    sqlite_path = os.getenv("SQLITE_PATH")
+    if not sqlite_path:
+        raise ValueError("SQLITE_PATH environment variable not set")
+
+    # Get date range
+    try:
+        start_date = date.fromisoformat(os.getenv("START_DATE", ""))
+        end_date = date.fromisoformat(os.getenv("END_DATE", ""))
+    except (ValueError, TypeError) as exc:
+        raise ValueError(
+            "START_DATE and END_DATE must be valid ISO format dates"
+        ) from exc
+
+    # Get GitHub organization tokens map
+    org_tokens_json = os.getenv("GITHUB_ORG_TOKENS_MAP", "{}")
+    try:
+        github_org_tokens_map = json.loads(org_tokens_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            "Invalid GITHUB_ORG_TOKENS_MAP format."
+        ) from exc
+
+    # Check if build flag is set
+    build_database = os.getenv("BUILD_DATABASE", "False").lower() == "true"
+
+    return LeadTimeConfiguration(
+        sqlite_path,
+        build_database,
+        start_date,
+        end_date,
+        github_org_tokens_map
+    )
+
+
+def create_releases_database(config: LeadTimeConfiguration):
     """Coordinate the creation of the releases database.
 
     Args:
@@ -35,16 +92,18 @@ def create_releases_database(
         org_to_env_var_map (dict[str, str]): Mapping from GitHub org to env var
     """
     logger.info(
-        "Creating releases database between %s and %s", start_date, end_date
+        "Creating releases database between %s and %s",
+        config.start_date,
+        config.end_date
     )
     # Initialize clients
     atlassian_client = AtlassianRequests()
-    github_client = GitHubRequests(org_to_env_var_map)
+    github_client = GitHubRequests(config.org_to_env_var_map)
 
     # Initialize database processor
-    db_processor = DatabaseProcessor()
+    db_processor = DatabaseProcessor(config.sqlite_path)
 
-    if not build_database:
+    if not config.build_database:
         db_processor.print_summary()
         return
 
@@ -61,10 +120,13 @@ def create_releases_database(
     # Step 3: Get and save releases
     logger.info(
         "-- 3. Getting releases between %s and %s from Atlassian Jira",
-        start_date,
-        end_date
+        config.start_date,
+        config.end_date
     )
-    releases = atlassian_client.get_releases(start_date, end_date)
+    releases = atlassian_client.get_releases(
+        config.start_date,
+        config.end_date
+    )
     db_processor.save_releases(releases)
 
     # Step 4: Find releases without stories, get stories and save them
@@ -116,7 +178,7 @@ def create_releases_database(
     db_processor.print_summary()
 
 
-def save_outlier_reports():
+def save_outlier_reports(config: LeadTimeConfiguration):
     """Save all outlier reports as CSV files.
 
     Creates a new directory named "outlier_reports_yyyy-mm-dd-hh-mm-ss"
@@ -135,7 +197,7 @@ def save_outlier_reports():
     logger.info("Created reports directory: %s", reports_dir)
 
     # Initialize outlier reports
-    outlier_reports = OutlierReports()
+    outlier_reports = OutlierReports(config.sqlite_path)
 
     # Dictionary mapping report functions to file names
     report_mapping = {
@@ -172,11 +234,11 @@ def save_outlier_reports():
                 report_name
             )
 
-    logger.info("All reports saved to directory: %s", reports_dir)
-    return str(reports_dir)
+    logger.info("Outlier reports saved to directory: %s", reports_dir.absolute())
+    return reports_dir
 
 
-def save_lead_time_chart(
+def _save_lead_time_chart(
     lead_time_report: LeadTimeReport,
     project_keys: list[str],
     start_date: date,
@@ -184,7 +246,6 @@ def save_lead_time_chart(
     title: str,
     file_path: pathlib.Path = None
 ):
-
     """
     Saves a lead time chart as an image file.
 
@@ -233,7 +294,7 @@ def save_lead_time_chart(
     logger.info("Saved '%s' to %s", title, file_path)
 
 
-def save_lead_time_charts(start_date: date, end_date: date):
+def save_lead_time_charts(config: LeadTimeConfiguration):
     """Generate and save lead time charts as PNG files.
 
     Creates a new directory named "lead_times_yyyy-mm-dd-hh-mm-ss"
@@ -256,8 +317,8 @@ def save_lead_time_charts(start_date: date, end_date: date):
 
     logger.info("Created charts directory: %s", charts_dir)
 
-    db_processor = DatabaseProcessor()
-    lead_time_report = LeadTimeReport()
+    db_processor = DatabaseProcessor(config.sqlite_path)
+    lead_time_report = LeadTimeReport(config.sqlite_path)
 
     # Get all projects
     all_projects = db_processor.retrieve_all_projects()
@@ -281,11 +342,11 @@ def save_lead_time_charts(start_date: date, end_date: date):
         project_key = project.project_key
         project_title = project.project_title
         title = f"Lead Time for {project_title}"
-        save_lead_time_chart(
+        _save_lead_time_chart(
             lead_time_report,
             [project_key],
-            start_date,
-            end_date,
+            config.start_date,
+            config.end_date,
             title,
             charts_dir / f"project_{project_key}"
         )
@@ -296,27 +357,27 @@ def save_lead_time_charts(start_date: date, end_date: date):
             continue
 
         title = f"Lead Time for {project_type.capitalize()} Projects"
-        save_lead_time_chart(
+        _save_lead_time_chart(
             lead_time_report,
             project_keys,
-            start_date,
-            end_date,
+            config.start_date,
+            config.end_date,
             title,
             charts_dir / f"type_{project_type}"
         )
 
     # Generate overall chart
-    save_lead_time_chart(
+    _save_lead_time_chart(
         lead_time_report,
         all_project_keys,
-        start_date,
-        end_date,
+        config.start_date,
+        config.end_date,
         "Overall Lead Time",
         charts_dir / "_overall"
     )
 
-    logger.info("All charts saved to directory: %s", charts_dir)
-    return str(charts_dir)
+    logger.info("Lead time charts saved to directory: %s", charts_dir.absolute())
+    return charts_dir
 
 
 def main():
@@ -331,59 +392,36 @@ def main():
         help="Build a new database"
     )
     parser.add_argument(
-        "--report",
+        "--reports",
         action="store_true",
         help="Generate outlier reports"
     )
     parser.add_argument(
-        "--lead-time",
+        "--charts",
         action="store_true",
         help="Generate lead time charts"
     )
     args = parser.parse_args()
-
-    load_dotenv(dotenv_path=".env.params")
-    load_dotenv()
-
-    # Read the GitHub organization to environment variable mapping
-    org_tokens_json = os.getenv("GITHUB_ORG_TOKENS_MAP", "{}")
-    try:
-        org_to_env_var_map = json.loads(org_tokens_json)
-    except json.JSONDecodeError:
-        logger.error("Invalid GITHUB_ORG_TOKENS_MAP format. Using empty map.")
-        org_to_env_var_map = {}
 
     # If no arguments are provided, show help
     if not args.build and not args.report and not args.lead_time:
         parser.print_help()
         return
 
-    build_database = args.build
+    config = load_lead_time_configuration()
 
     # If build flag is set, create the database
+    build_database = args.build and config.build_database
     if build_database:
-        create_releases_database(
-            build_database,
-            date.fromisoformat(os.getenv("START_DATE")),
-            date.fromisoformat(os.getenv("END_DATE")),
-            org_to_env_var_map=org_to_env_var_map
-        )
+        create_releases_database(config)
 
-    # Generate reports if --report flag is set
+    # Generate reports if flag is set
     if args.report:
-        reports_dir = save_outlier_reports()
-        logger.info("Reports generated successfully in %s", reports_dir)
+        save_outlier_reports(config)
 
-    # Generate lead time charts if --lead-time flag is set
+    # Generate lead time charts if flag is set
     if args.lead_time:
-        charts_dir = save_lead_time_charts(
-            date.fromisoformat(os.getenv("START_DATE")),
-            date.fromisoformat(os.getenv("END_DATE"))
-        )
-        logger.info(
-            "Lead time charts generated successfully in %s",
-            charts_dir
-        )
+        save_lead_time_charts(config)
 
 
 if __name__ == "__main__":

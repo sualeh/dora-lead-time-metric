@@ -5,7 +5,6 @@ import os
 import pathlib
 from datetime import date, datetime
 import sqlite3
-from dotenv import load_dotenv
 from dora_lead_time.models import PullRequestIdentifier, Project
 
 logging.basicConfig(
@@ -18,35 +17,37 @@ logger = logging.getLogger(__name__)
 class DatabaseProcessor:
     """Database operations to create releases database."""
 
-    def __init__(self, sqlite_path=None):
+    def __init__(self, sqlite_path: str):
         """Initialize the database processor with database path.
 
         Args:
             sqlite_path (str, optional): Path to SQLite database file.
                 Defaults to the value set in constructor.
         """
-        load_dotenv()
-        self.sqlite_path = sqlite_path or os.getenv("SQLITE_PATH")
-        if not self.sqlite_path:
-            logger.info("SQLite location not set")
+        if not sqlite_path:
+            raise ValueError("SQLite location not set")
+        self.sqlite_path = sqlite_path
 
     def _get_connection(self, check_exists=True):
         """Get a SQLite connection with proper type handling.
 
         Args:
-            check_exists (bool, optional): If True, checks if the database file exists
-                before connecting. Defaults to True.
+            check_exists (bool, optional): If True, checks if the database
+                file exists before connecting. Defaults to True.
 
         Returns:
             sqlite3.Connection: A connection to the SQLite database
 
         Raises:
-            FileNotFoundError: If the database file does not exist and check_exists is True
+            FileNotFoundError: If the database file does not exist
+                and check_exists is True
         """
         sqlite_path = self.sqlite_path
 
         if check_exists and not os.path.exists(sqlite_path):
-            raise FileNotFoundError(f"Database file does not exist: {sqlite_path}")
+            raise FileNotFoundError(
+                f"Database file does not exist: {sqlite_path}"
+            )
 
         # Register adapters for Python objects to SQLite types
         sqlite3.register_adapter(date, lambda val: val.isoformat())

@@ -9,7 +9,12 @@ from typing import Dict, List
 import requests
 from dotenv import load_dotenv
 
-from dora_lead_time.models import Project, Release, Story, PullRequestIdentifier
+from dora_lead_time.models import (
+    Project,
+    Release,
+    Story,
+    PullRequestIdentifier,
+)
 
 logging.basicConfig(
     level=logging.INFO,

@@ -5,13 +5,11 @@ import os
 from typing import NamedTuple
 from datetime import date, datetime
 import sqlite3
-from dotenv import load_dotenv
 import pandas as pd
 from pandas import DataFrame
 import matplotlib.pyplot as plt
 import numpy as np
 from dora_lead_time.date_utility import DateUtility
-import pathlib
 
 logging.basicConfig(
     level=logging.INFO,
@@ -58,7 +56,7 @@ class LeadTimeReport:
         sqlite_path: Path to the SQLite database file containing release data.
     """
 
-    def __init__(self, sqlite_path=None):
+    def __init__(self, sqlite_path: str):
         """Initialize the report generator with database path.
 
         Args:
@@ -66,10 +64,10 @@ class LeadTimeReport:
                 Defaults to the value from the SQLITE_PATH
                 environment variable.
         """
-        load_dotenv()
-        self.sqlite_path = sqlite_path or os.getenv("SQLITE_PATH")
-        if not self.sqlite_path:
-            logger.info("SQLite location not set")
+        if not sqlite_path or not os.path.exists(sqlite_path):
+            raise ValueError(f"SQLite database file not found: {sqlite_path}")
+
+        self.sqlite_path = sqlite_path
 
     def _get_connection(self):
         """Get a SQLite connection with proper type handling.

@@ -5,7 +5,6 @@ import os
 from datetime import date, datetime
 import pathlib
 import sqlite3
-from dotenv import load_dotenv
 import pandas as pd
 
 logging.basicConfig(
@@ -27,17 +26,16 @@ class OutlierReports:
         sql_dir: Directory path where SQL query files are stored.
     """
 
-    def __init__(self, sqlite_path: str = None):
+    def __init__(self, sqlite_path: str):
         """Initialize the database processor with database path.
 
         Args:
             sqlite_path (str, optional): Path to SQLite database file.
                 Defaults to the value from SQLITE_PATH environment variable.
         """
-        load_dotenv()
-        self.sqlite_path = sqlite_path or os.getenv("SQLITE_PATH")
-        if not self.sqlite_path:
-            logger.warning("SQLite location not set")
+        if not sqlite_path or not os.path.exists(sqlite_path):
+            raise ValueError("SQLite location not set")
+        self.sqlite_path = sqlite_path
 
         # Create a directory for SQL files if it doesn't exist
         sql_dir = pathlib.Path(__file__).parent / "outlier_reports"
