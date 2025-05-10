@@ -258,6 +258,7 @@ class LeadTimeReport:
         ax.spines['right'].set_visible(False)
         ax.spines['bottom'].set_color('gray')
         ax.spines['left'].set_color('gray')
+        ax.set_box_aspect(9/16)
         ax.tick_params(axis='both', colors='gray')
 
         xlabel = df.columns[0]
@@ -282,15 +283,20 @@ class LeadTimeReport:
 
         x = np.arange(len(df[xlabel]))
         plt.xticks(x, df[xlabel], rotation=45)
-
-        plt.legend()
+        legend = plt.legend(
+            fontsize=9,
+            facecolor="whitesmoke",
+            frameon=False
+        )
+        for text in legend.get_texts():
+            text.set_color("gray")
 
         # Add footer
         plt.figtext(
             0.5, 0.1,  # x, y position (centered, bottom)
             footer,
             ha='center',  # horizontal alignment
-            fontsize=8
+            fontsize=9
         )
         # Add extra space at the bottom for the footer
         plt.subplots_adjust(bottom=0.3)
