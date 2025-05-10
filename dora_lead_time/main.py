@@ -67,7 +67,7 @@ def load_lead_time_configuration() -> LeadTimeConfiguration:
         github_org_tokens_map = json.loads(org_tokens_json)
     except json.JSONDecodeError as exc:
         raise ValueError(
-            "Invalid GITHUB_ORG_TOKENS_MAP format."
+            "Invalid GITHUB_ORG_TOKENS_MAP format"
         ) from exc
 
     # Check if build flag is set
