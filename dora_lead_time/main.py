@@ -234,7 +234,10 @@ def save_outlier_reports(config: LeadTimeConfiguration):
                 report_name
             )
 
-    logger.info("Outlier reports saved to directory: %s", reports_dir.absolute())
+    logger.info(
+        "Outlier reports saved to directory: %s",
+        reports_dir.absolute()
+    )
     return reports_dir
 
 
@@ -376,7 +379,10 @@ def save_lead_time_charts(config: LeadTimeConfiguration):
         charts_dir / "_overall"
     )
 
-    logger.info("Lead time charts saved to directory: %s", charts_dir.absolute())
+    logger.info(
+        "Lead time charts saved to directory: %s",
+        charts_dir.absolute()
+    )
     return charts_dir
 
 

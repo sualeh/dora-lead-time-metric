@@ -151,7 +151,8 @@ class DatabaseProcessor:
         """
         conn = None
         try:
-            # When creating a schema, we don't want to check if the database exists
+            # When creating a schema,
+            # we don't want to check if the database exists
             conn = self._get_connection(check_exists=False)
             cursor = conn.cursor()
 
