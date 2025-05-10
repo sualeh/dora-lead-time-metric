@@ -14,7 +14,6 @@ MonthBoundary = namedtuple(
 )
 
 
-
 class DateUtility:
     """Utility class for date operations used in charts and reports."""
 

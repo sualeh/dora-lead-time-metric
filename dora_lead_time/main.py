@@ -219,76 +219,17 @@ def save_lead_time_charts(start_date: date, end_date: date):
 
         projects_by_type[project_type].append(project_key)
 
-    def generate_and_save_chart(project_keys, title, filename):
-        """Generate and save a lead time chart.
-
-        Args:
-            project_keys (list): List of project keys to include in the chart
-            title (str): Title for the chart
-            filename (str): Filename to save the chart (without extension)
-
-        Returns:
-            bool: True if chart was generated, False if no data
-        """
-        logger.info("Generating chart: %s", title)
-
-        lead_time = lead_time_report.calculate_lead_time(
-            project_keys,
-            start_date,
-            end_date
-        )
-        lead_time_summary = \
-            "Lead time for changes is " \
-            f"{int(lead_time.average_lead_time)} days average " \
-            f"over {lead_time.number_of_releases} releases"
-
-        # Generate monthly lead time report
-        df = lead_time_report.monthly_lead_time_report(
-            project_keys, start_date, end_date
-        )
-
-        if not df.empty and df["Lead Time"].sum() > 0:
-            # Create plot
-            plot = lead_time_report.show_plot(df, title=title)
-            # Add footer with lead time summary
-            plot.figtext(
-                0.5, 0.1,  # x, y position (centered, bottom)
-                lead_time_summary,
-                ha='center',  # horizontal alignment
-                fontsize=8
-            )
-            # Add extra space at the bottom for the footer
-            plot.subplots_adjust(bottom=0.3)
-
-            # Save plot
-            file_path = charts_dir / f"{filename}.png"
-            plot.savefig(
-                file_path,
-                dpi=600,
-                format="png",
-                bbox_inches="tight",
-                pad_inches=0.3
-            )
-            plot.close()  # Close plot to free memory
-
-            logger.info("Saved chart to %s", file_path)
-            return True
-        else:
-            logger.info(
-                "No lead time data for %s, skipping chart creation",
-                title
-            )
-            return False
-
     # Generate chart for each individual project
     for project in all_projects:
         project_key = project.project_key
         project_title = project.project_title
-        title = f"Lead Time for {project_title} ({project_key})"
-        generate_and_save_chart(
+        title = f"Lead Time for {project_title}"
+        lead_time_report.generate_and_save_chart(
             [project_key],
+            start_date,
+            end_date,
             title,
-            f"project_{project_key}"
+            charts_dir / f"project_{project_key}"
         )
 
     # Generate chart for each project type
@@ -297,17 +238,21 @@ def save_lead_time_charts(start_date: date, end_date: date):
             continue
 
         title = f"Lead Time for {project_type.capitalize()} Projects"
-        generate_and_save_chart(
+        lead_time_report.generate_and_save_chart(
             project_keys,
+            start_date,
+            end_date,
             title,
-            f"type_{project_type}"
+            charts_dir / f"type_{project_type}"
         )
 
     # Generate overall chart
-    generate_and_save_chart(
+    lead_time_report.generate_and_save_chart(
         all_project_keys,
+        start_date,
+        end_date,
         "Overall Lead Time",
-        "overall"
+        charts_dir / "_overall"
     )
 
     logger.info("All charts saved to directory: %s", charts_dir)

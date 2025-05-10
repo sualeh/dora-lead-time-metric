@@ -11,6 +11,7 @@ from pandas import DataFrame
 import matplotlib.pyplot as plt
 import numpy as np
 from dora_lead_time.date_utility import DateUtility
+import pathlib
 
 logging.basicConfig(
     level=logging.INFO,
@@ -105,7 +106,10 @@ class LeadTimeReport:
         return conn
 
     def calculate_lead_time(
-        self, project_keys: list[str], start_date: date, end_date: date
+        self,
+        project_keys: list[str],
+        start_date: date,
+        end_date: date
     ) -> LeadTimeResult:
         """Calculate lead time for project releases between two dates.
 
@@ -223,9 +227,11 @@ class LeadTimeReport:
     def show_plot(
         self,
         df: pd.DataFrame,
-        title: str = ""
+        title: str = "",
+        footer: str = ""
     ) -> plt.Figure:
-        """Create a plot of lead time data.
+        """
+        Create a plot of lead time data.
 
         Generates a matplotlib plot visualization of the lead time data,
         optionally including trend lines.
@@ -242,12 +248,22 @@ class LeadTimeReport:
         """
         colors = ["blue", "cyan", "red", "pink"]
 
-        plt.figure(figsize=(10, 5))
+        # plt.style.use("fivethirtyeight")
+
+        plt.figure(figsize=(16, 9))
+        fig, ax = plt.subplots()
+        fig.patch.set_facecolor('whitesmoke')
+        ax.set_facecolor('whitesmoke')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_color('gray')
+        ax.spines['left'].set_color('gray')
+        ax.tick_params(axis='both', colors='gray')
 
         xlabel = df.columns[0]
-        plt.xlabel(xlabel)
-        plt.ylabel("Values")
-        plt.title(title)
+        plt.xlabel(xlabel, color='gray')
+        plt.ylabel("Values", color='gray')
+        plt.title(title, pad=20)
 
         for idx, column in enumerate(df.columns[1:]):
             x = np.arange(len(df[xlabel]))
@@ -269,7 +285,73 @@ class LeadTimeReport:
 
         plt.legend()
 
+        # Add footer
+        plt.figtext(
+            0.5, 0.1,  # x, y position (centered, bottom)
+            footer,
+            ha='center',  # horizontal alignment
+            fontsize=8
+        )
+        # Add extra space at the bottom for the footer
+        plt.subplots_adjust(bottom=0.3)
+
         return plt
+
+    def generate_and_save_chart(
+        self,
+        project_keys: list[str],
+        start_date: date,
+        end_date: date,
+        title: str,
+        file_path: pathlib.Path = None
+    ):
+        """Generate and save a lead time chart.
+
+        Args:
+            project_keys (list): List of project keys to include in the chart
+            title (str): Title for the chart
+            filename (str): Filename to save the chart (without extension)
+        """
+        logger.info("Generating chart: %s", title)
+
+        lead_time = self.calculate_lead_time(
+            project_keys,
+            start_date,
+            end_date
+        )
+        lead_time_summary = \
+            "Lead time for changes is " \
+            f"{int(lead_time.average_lead_time)} days average " \
+            f"over {lead_time.number_of_releases} releases"
+
+        # Generate monthly lead time report
+        df = self.monthly_lead_time_report(
+            project_keys, start_date, end_date
+        )
+        image_format = "png"
+        if not df.empty and df["Lead Time"].sum() > 0:
+            # Create plot
+            plot = self.show_plot(
+                df,
+                title=title,
+                footer=lead_time_summary
+            )
+            # Save plot
+            plot.savefig(
+                file_path.with_suffix(f".{image_format}"),
+                dpi=600,
+                format=image_format,
+                bbox_inches="tight",
+                pad_inches=0.3
+            )
+            plot.close()  # Close plot to free memory
+
+            logger.info("Saved chart to %s", file_path)
+        else:
+            logger.warning(
+                "No lead time data for %s, skipping chart creation",
+                title
+            )
 
 
 def main():
