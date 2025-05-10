@@ -224,7 +224,7 @@ class LeadTimeReport:
         monthly_lead_time_report_data_frame = pd.DataFrame(lead_times_frame)
         return monthly_lead_time_report_data_frame
 
-    def show_plot(
+    def _create_plot(
         self,
         df: pd.DataFrame,
         title: str = "",
@@ -303,14 +303,13 @@ class LeadTimeReport:
 
         return plt
 
-    def generate_and_save_chart(
+    def create_lead_time_chart(
         self,
         project_keys: list[str],
         start_date: date,
         end_date: date,
-        title: str,
-        file_path: pathlib.Path = None
-    ):
+        title: str
+    ) -> plt.Figure:
         """Generate and save a lead time chart.
 
         Args:
@@ -334,30 +333,19 @@ class LeadTimeReport:
         df = self.monthly_lead_time_report(
             project_keys, start_date, end_date
         )
-        image_format = "png"
         if not df.empty and df["Lead Time"].sum() > 0:
-            # Create plot
-            plot = self.show_plot(
+            plot = self._create_plot(
                 df,
                 title=title,
                 footer=lead_time_summary
             )
-            # Save plot
-            plot.savefig(
-                file_path.with_suffix(f".{image_format}"),
-                dpi=600,
-                format=image_format,
-                bbox_inches="tight",
-                pad_inches=0.3
-            )
-            plot.close()  # Close plot to free memory
-
-            logger.info("Saved chart to %s", file_path)
+            return plot
         else:
             logger.warning(
                 "No lead time data for %s, skipping chart creation",
                 title
             )
+            return None
 
 
 def main():

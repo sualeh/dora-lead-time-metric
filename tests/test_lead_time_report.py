@@ -122,7 +122,7 @@ def test_show_plot():
     plt.close('all')  # Close any existing plots
     report = LeadTimeReport("test_db_path")
 
-    plot = report.show_plot(df, title="Test Plot")
+    plot = report._create_plot(df, title="Test Plot")
     assert plot is not None
     plt.close('all')
 

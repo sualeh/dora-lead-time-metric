@@ -176,6 +176,63 @@ def save_outlier_reports():
     return str(reports_dir)
 
 
+def save_lead_time_chart(
+    lead_time_report: LeadTimeReport,
+    project_keys: list[str],
+    start_date: date,
+    end_date: date,
+    title: str,
+    file_path: pathlib.Path = None
+):
+
+    """
+    Saves a lead time chart as an image file.
+
+    This function generates a lead time chart using the provided parameters
+    and saves it to the specified file path in PNG format.
+
+    Args:
+        lead_time_report (LeadTimeReport): An instance of LeadTimeReport used
+            to create the chart.
+        project_keys (list[str]): A list of project keys to include
+            in the chart.
+        start_date (date): The start date for the lead time data.
+        end_date (date): The end date for the lead time data.
+        title (str): The title of the chart.
+        file_path (pathlib.Path, optional): The file path where the chart
+            will be saved.
+            If not provided, a default path should be specified by the caller.
+
+    Raises:
+        ValueError: If any of the input parameters are invalid.
+        IOError: If there is an issue saving the file.
+
+    Side Effects:
+        Saves the chart as a PNG file at the specified location.
+        Logs the save operation.
+
+    """
+
+    plot = lead_time_report.create_lead_time_chart(
+        project_keys,
+        start_date,
+        end_date,
+        title
+    )
+    if plot is None:
+        return
+
+    image_format = "png"
+    # Save plot
+    plot.savefig(
+        file_path.with_suffix(f".{image_format}"),
+        dpi=600,
+        format=image_format
+    )
+    plot.close()  # Close plot to free memory
+    logger.info("Saved '%s' to %s", title, file_path)
+
+
 def save_lead_time_charts(start_date: date, end_date: date):
     """Generate and save lead time charts as PNG files.
 
@@ -224,7 +281,8 @@ def save_lead_time_charts(start_date: date, end_date: date):
         project_key = project.project_key
         project_title = project.project_title
         title = f"Lead Time for {project_title}"
-        lead_time_report.generate_and_save_chart(
+        save_lead_time_chart(
+            lead_time_report,
             [project_key],
             start_date,
             end_date,
@@ -238,7 +296,8 @@ def save_lead_time_charts(start_date: date, end_date: date):
             continue
 
         title = f"Lead Time for {project_type.capitalize()} Projects"
-        lead_time_report.generate_and_save_chart(
+        save_lead_time_chart(
+            lead_time_report,
             project_keys,
             start_date,
             end_date,
@@ -247,7 +306,8 @@ def save_lead_time_charts(start_date: date, end_date: date):
         )
 
     # Generate overall chart
-    lead_time_report.generate_and_save_chart(
+    save_lead_time_chart(
+        lead_time_report,
         all_project_keys,
         start_date,
         end_date,
