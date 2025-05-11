@@ -84,26 +84,12 @@ END_DATE=2023-12-31
 Then run code similar to the following to generate a lead time report:
 
 ```python
-from datetime import date
-from dora_lead_time.lead_time_report import LeadTimeReport
+import dora_lead_time.main
 
-# Initialize the report generator
-report = LeadTimeReport("releases.db")
-
-# Define the scope
-project_keys = ["FRONTEND", "BACKEND", "MOBILE"]
-start_date = date(2025, 1, 1)
-end_date = date(2025, 12, 31)
-
-# Generate a monthly report
-monthly_data = report.monthly_lead_time_report(project_keys, start_date, end_date)
-
-# Display and visualize the report
-print(monthly_data)
-
-# Create a visualization
-plt = report.show_plot(monthly_data, title="2025 Monthly Lead Time", show_trend=True)
-plt.savefig('lead_time_trend.png')
+config = dora_lead_time.main.load_lead_time_configuration()
+dora_lead_time.main.create_releases_database(config)
+dora_lead_time.main.save_lead_time_charts(config)
+dora_lead_time.main.save_outlier_reports(config)
 ```
 
 > The full code is available on [GitHub](https://github.com/username/dora-lead-time-metric).
@@ -115,7 +101,7 @@ The report allows you to:
 - Identify when process changes impact lead time
 - Set targets based on DORA performance levels
 
-Additionally, the project includes SQL-based outlier reports to identify issues like:
+Additionally, the project includes outlier reports to identify issues like:
 
 - Projects without releases
 - Releases with open stories

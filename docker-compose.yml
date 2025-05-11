@@ -1,5 +1,5 @@
 services:
-  dora-lead-time-metric:
+  dora-lead-time:
     image: sualehfatehi/dora-lead-time-metric:latest
     env_file:
       - .env

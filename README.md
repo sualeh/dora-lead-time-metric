@@ -3,92 +3,114 @@
 
 # DORA Lead Time Metric
 
-## DORA Lead Time for Changes
+A tool to generate lead time charts and outlier reports by connecting data from Jira and GitHub.
+
+## Overview
 
 Lead Time for Changes is one of the four key DORA (DevOps Research and Assessment) metrics that measure software delivery performance. It measures the time it takes from when code is committed to when it is successfully running in production. A shorter lead time indicates an organization's ability to respond quickly to customer needs and fix problems rapidly.
 
 This Python package calculates lead time by connecting data from Jira and GitHub. The calculation involves going from Projects → Releases → Stories → Pull Requests → Commits, calculating the lead time for each pull request, and averaging those over a given time period.
 
 
-## How to Use
-
-See [Calculate the DORA Lead Time Metric in Python](https://dev.to/sualeh/calculate-the-dora-lead-time-metric-in-python-2bhn) for a detailed explanation of how to use this code. The code is at [sualeh/dora-lead-time-metric](https://github.com/sualeh/dora-lead-time-metric).
-
-
-## Build
-
-Install
+## Requirements
 
 - Python 3.13 or higher
-- Poetry (Python dependency manager)
+- OpenAI API key and other parameters (set in your .env file)
 
-Clone the repository:
+## Installation
 
-  ```bash
-  git clone https://github.com/sualeh/dora-lead-time-metric.git
-  cd dora-lead-time-metric
-  ```
+This project uses [Poetry](https://python-poetry.org/) for dependency management.
 
-Install dependencies using Poetry:
+1. Install Poetry by following the instructions in the [official documentation](https://python-poetry.org/docs/#installation).
 
-```bash
-poetry install
-```
+    Quick installation methods:
 
-Create an `.env` file in the project root based on `.env.example`
+    ```bash
+    # For Linux, macOS, Windows (WSL)
+    curl -sSL https://install.python-poetry.org | python3 -
+    ```
 
-Activate the Poetry environment:
+    ```pwsh
+    # For Windows PowerShell
+    (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+    ```
 
-```bash
-poetry shell
-```
+2. Install Project Dependencies
 
-Run the main application:
+    ```bash
+    # Clone the repository
+    git clone https://github.com/sualeh/dora-lead-time-metric.git
+    cd dora-lead-time-metric
+    ```
 
-```bash
-python -m dora_lead_time.main
-```
+3. Install dependencies using Poetry
 
-Generate reports with code similar to the following:
-
-```python
-from dora_lead_time.lead_time_report import LeadTimeReport
-
-# Initialize the report generator
-report = LeadTimeReport("releases.db")
-
-# Generate a monthly report
-monthly_data = report.monthly_lead_time_report(
-    ["PROJECT1", "PROJECT2"],
-    date(2023, 1, 1),
-    date(2023, 12, 31)
-)
-
-# Visualize the report
-plt = report.show_plot(monthly_data, title="Monthly Lead Time", show_trend=True)
-plt.savefig('lead_time_trend.png')
-```
+    ```bash
+    poetry install --extras "dev"
+    poetry show --tree
+    ```
 
 
-## With Docker
+## Configuration
 
-Build the Docker image:
+
+Create an ".env" file in the project root based on ".env.example", and similarly create an ".env.params" file based on ".env.params.example".
+
+## Usage
+
+1. Create releases database
 
 ```bash
-docker build -t dora-lead-time-metric .
+poetry run python -m dora_lead_time.main --build
 ```
 
-or download it from Docker Hub:
+2. Generate lead time charts
 
 ```bash
-docker pull sualeh.fatehi/dora-lead-time-metric
+poetry run python -m dora_lead_time.main --charts
 ```
 
-Run the container:
+3. Generate outlier reports
 
 ```bash
-docker run -it --rm \
-  --env-file .env \
-  -v "$(pwd)/data:/data" \
-  dora-lead-time-metric
+poetry run python -m dora_lead_time.main --reports
 ```
+
+
+## Development and Testing
+
+1. Install dependencies, as above.
+
+2. Run all tests:
+
+    ```bash
+    poetry run pytest
+    ```
+
+
+## Docker Compose Usage
+
+You can also use Docker Compose for easier management of the Local RAG container:
+
+1. Clone the project, as described above.
+
+2. Configure the ".env" and ".env.params" files as described above.
+
+3. Run the application using Docker Compose:
+
+      ```bash
+      # To build a releases database
+      docker-compose run dora-lead-time --build
+      ```
+
+      ```bash
+      # To generate lead time charts
+      docker-compose run dora-lead-time --charts
+      ```
+
+      ```bash
+      # To generate outlier reports
+      docker-compose run dora-lead-time --reports
+      ```
+
+This approach simplifies volume mounting and environment variable management, especially when working with the tool regularly.
