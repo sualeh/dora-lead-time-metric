@@ -1,0 +1,8 @@
+services:
+  local-dir-rag:
+    image: sualehfatehi/dora-lead-time-metric:latest
+    env_file:
+      - .env
+      - .env.params
+    volumes:
+      - .:/app
