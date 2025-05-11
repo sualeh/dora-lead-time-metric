@@ -1,5 +1,5 @@
 services:
-  local-dir-rag:
+  dora-lead-time-metric:
     image: sualehfatehi/dora-lead-time-metric:latest
     env_file:
       - .env
