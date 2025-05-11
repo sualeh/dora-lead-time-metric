@@ -395,7 +395,7 @@ def main():
     parser.add_argument(
         "--build",
         action="store_true",
-        help="Build a new database"
+        help="Build a new database, or update the existing one"
     )
     parser.add_argument(
         "--reports",
@@ -410,7 +410,7 @@ def main():
     args = parser.parse_args()
 
     # If no arguments are provided, show help
-    if not args.build and not args.report and not args.lead_time:
+    if not args.build and not args.reports and not args.charts:
         parser.print_help()
         return
 
@@ -422,11 +422,11 @@ def main():
         create_releases_database(config)
 
     # Generate reports if flag is set
-    if args.report:
+    if args.reports:
         save_outlier_reports(config)
 
     # Generate lead time charts if flag is set
-    if args.lead_time:
+    if args.charts:
         save_lead_time_charts(config)
 
 
