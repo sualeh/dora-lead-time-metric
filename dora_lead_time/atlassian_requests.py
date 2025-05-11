@@ -27,7 +27,7 @@ class AtlassianRequests:
     """Atlassian API requests to Jira."""
 
     def __init__(
-        self, jira_instance=None, email=None, token=None, request_timeout=30
+        self, jira_instance=None, email=None, request_timeout=30
     ):
         """Initialize the Atlassian API client with credentials.
 
@@ -38,9 +38,6 @@ class AtlassianRequests:
             email (str, optional): Atlassian account email.
                 Defaults to environmental variable value for
                 EMAIL.
-            token (str, optional): Atlassian API token.
-                Defaults to environmental variable value for
-                ATLASSIAN_TOKEN.
             request_timeout (int, optional): HTTP request timeout in seconds.
                 Defaults to 30.
 
@@ -51,7 +48,7 @@ class AtlassianRequests:
 
         self.jira_instance = jira_instance or os.getenv("JIRA_INSTANCE")
         self.email = email or os.getenv("EMAIL")
-        self.token = token or os.getenv("ATLASSIAN_TOKEN")
+        self.token = os.getenv("ATLASSIAN_TOKEN")
         self.request_timeout = request_timeout
 
         if not all([self.jira_instance, self.email, self.token]):

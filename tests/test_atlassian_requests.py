@@ -47,12 +47,11 @@ def test_init_with_params():
     """Test initialization with explicit parameters."""
     client = AtlassianRequests(
         jira_instance="custom.atlassian.net",
-        email="custom@example.com",
-        token="custom-token",
+        email="custom@example.com"
     )
     assert client.jira_instance == "custom.atlassian.net"
     assert client.email == "custom@example.com"
-    assert client.token == "custom-token"
+    assert client.token == "test-token"
 
 
 def test_init_with_env_vars():
@@ -341,8 +340,7 @@ def test_get_stories_validation():
     """Test input validation for get_stories method."""
     client = AtlassianRequests(
         jira_instance="test.atlassian.net",
-        email="test@example.com",
-        token="test-token"
+        email="test@example.com"
     )
 
     # Test with non-list input
