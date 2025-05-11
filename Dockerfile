@@ -21,10 +21,9 @@ RUN \
 
 # Create directories for mounting volumes
 RUN \
-    mkdir -p /data/docs /data/vector_db && \
     # Create a non-root user to run the application
     adduser --disabled-password --gecos "" appuser && \
-    chown -R appuser:appuser /app /data
+    chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser

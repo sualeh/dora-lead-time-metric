@@ -2,6 +2,9 @@ name: Docker Build and Publish
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v1.0.0
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -29,17 +32,22 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # This step extracts metadata for Docker tags from Git references
       - id: meta
         name: Extract metadata for Docker
         uses: docker/metadata-action@v5
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
+            # For Git tags (like v1.0.0), use the tag as Docker tag (1.0.0)
             type=semver,pattern={{version}}
+            # Create additional tags for major.minor (e.g., 1.0)
             type=semver,pattern={{major}}.{{minor}}
+            # Use Git tag as-is (including the 'v' prefix if present)
+            type=ref,event=tag
+            # Tag with the short SHA for all builds
             type=sha,format=short
+            # Add 'latest' tag only for main branch
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
       - id: build_and_push
