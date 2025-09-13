@@ -58,7 +58,9 @@ class ClassName:
 - Use meaningful variable and function names
 - Include type hints where appropriate
 - Use f-strings only for simple string formatting in non-logging scenarios
+- Use lazy % formatting in logging functions
 - Follow the project's `.editorconfig` rules
+- Do not use the `global` statement, but prefer to use a more functional style of programming
 
 ## Jupyter Notebooks
 
