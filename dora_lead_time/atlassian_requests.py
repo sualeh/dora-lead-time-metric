@@ -199,7 +199,7 @@ class AtlassianRequests:
             "Content-Type": "application/json",
         }
         auth = (self.email, self.token)
-        url = f"https://{self.jira_instance}/rest/api/3/search"
+        url = f"https://{self.jira_instance}/rest/api/3/search/jql"
         releases_str = ",".join(releases)
         jql_query = f"""
         fixVersion IN ({releases_str})
