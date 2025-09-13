@@ -210,14 +210,15 @@ class AtlassianRequests:
         start_at = 0
         max_results = 25
         all_stories = []
-        total_results = None
+        is_last = False
+        next_page_token = None
 
         # Fetch all pages of results
-        while total_results is None or start_at < total_results:
+        while not is_last:
             params = {
                 "jql": jql_query,
                 "maxResults": max_results,
-                "startAt": start_at,
+                "nextPageToken": next_page_token,
                 "fields": (
                     "fixVersions,key,summary,issuetype,"
                     "created,resolutiondate"
@@ -235,7 +236,8 @@ class AtlassianRequests:
             response.raise_for_status()
 
             data = response.json()
-            total_results = data["total"]
+            is_last = data.get("isLast", False)
+            next_page_token = data.get("nextPageToken")
 
             # Process current batch of issues
             for issue in data["issues"]:
@@ -280,11 +282,9 @@ class AtlassianRequests:
 
             # Safety check - if we got an empty batch but haven't reached
             # total, something is wrong
-            if len(data["issues"]) == 0 and start_at < total_results:
+            if len(data["issues"]) == 0 and next_page_token is not None:
                 logger.warning(
-                    "Received empty batch but only fetched %d/%d stories",
-                    start_at,
-                    total_results,
+                    "Received empty batch but more stories are expected"
                 )
                 break
 
