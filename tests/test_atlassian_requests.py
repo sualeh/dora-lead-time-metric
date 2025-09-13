@@ -228,7 +228,8 @@ def test_get_stories(mock_get, atlassian_client):
     """Test getting stories for releases."""
     # Mock response data for Jira search API
     mock_stories_response = {
-        "total": 2,
+        "nextPageToken": None,
+        "isLast": True,
         "issues": [
             {
                 "key": "TEST-1",
