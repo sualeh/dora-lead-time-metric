@@ -137,14 +137,14 @@ class AtlassianRequests:
 
         releases = []
         for project_key in project_keys:
-            url = f"{projects_url}/{project_key}/version"
+            url = f"{projects_url}/{project_key}/versions"
             response = requests.get(
                 url, headers=headers, auth=auth, timeout=self.request_timeout
             )
             if response.status_code != 200:
                 continue
 
-            versions = response.json()["values"]
+            versions = response.json()
             for version in versions:
                 if "releaseDate" in version and version.get("released", False):
                     release_date = datetime.fromisoformat(

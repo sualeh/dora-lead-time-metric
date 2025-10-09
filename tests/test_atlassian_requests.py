@@ -145,8 +145,7 @@ def test_get_releases(mock_get, atlassian_client):
     ]
 
     # Mock versions response for TEST project
-    mock_test_versions = {
-        "values": [
+    mock_test_versions = [
             {
                 "id": "10000",
                 "name": "1.0.0",
@@ -169,11 +168,9 @@ def test_get_releases(mock_get, atlassian_client):
                 "released": False,  # Unreleased
             },
         ]
-    }
 
     # Mock versions response for DEV project
-    mock_dev_versions = {
-        "values": [
+    mock_dev_versions = [
             {
                 "id": "20000",
                 "name": "0.1.0",
@@ -189,16 +186,15 @@ def test_get_releases(mock_get, atlassian_client):
                 "released": True,
             },
         ]
-    }
 
     # Configure mock to return different responses based on URL
     def side_effect(*args, **kwargs):
         url = args[0]
         if url == "https://test.atlassian.net/rest/api/3/project":
             return MockResponse(mock_projects)
-        elif url == "https://test.atlassian.net/rest/api/3/project/TEST/version":
+        elif url == "https://test.atlassian.net/rest/api/3/project/TEST/versions":
             return MockResponse(mock_test_versions)
-        elif url == "https://test.atlassian.net/rest/api/3/project/DEV/version":
+        elif url == "https://test.atlassian.net/rest/api/3/project/DEV/versions":
             return MockResponse(mock_dev_versions)
         return MockResponse({}, 404)
 
