@@ -13,7 +13,7 @@ jobs:
     steps:
       - id: checkout
         name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - id: setup-python
         name: Set up Python
