@@ -22,7 +22,7 @@ jobs:
 
       - id: setup_buildx
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - id: docker_login
         name: Login to DockerHub
