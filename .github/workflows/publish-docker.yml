@@ -35,7 +35,7 @@ jobs:
       # This step extracts metadata for Docker tags from Git references
       - id: meta
         name: Extract metadata for Docker
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
           tags: |
