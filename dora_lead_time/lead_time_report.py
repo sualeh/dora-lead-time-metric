@@ -147,6 +147,7 @@ class LeadTimeReport:
             WHERE
                 lead_times.project_key
                     IN ({project_keys_placeholders})
+                AND lead_times.lead_time > 0
                 AND lead_times.release_date
                     BETWEEN ? AND ?
             """
