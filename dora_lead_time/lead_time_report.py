@@ -114,6 +114,11 @@ class LeadTimeReport:
         Calculates the average lead time and number of releases for the
         specified projects within the given date range.
 
+        The average is computed over individual PR lead times, not per
+        release. A release with many PRs contributes proportionally more
+        to the average than a release with few PRs. PRs with a lead time
+        of zero or less (same-day or post-release commits) are excluded.
+
         Args:
             project_keys: List of project keys to include (e.g., ['PR', 'TS']).
             start_date: Start date for the time period (inclusive).
@@ -212,7 +217,7 @@ class LeadTimeReport:
                 project_keys, month_details.start_date, month_details.end_date
             )
             month_names.append(f"{year}-{month}")
-            lead_times.append(int(lead_time.average_lead_time))
+            lead_times.append(round(lead_time.average_lead_time))
             number_of_releases.append(lead_time.number_of_releases)
 
         lead_times_frame = {}
@@ -325,7 +330,7 @@ class LeadTimeReport:
         )
         lead_time_summary = \
             "Lead time for changes is " \
-            f"{int(lead_time.average_lead_time)} days average " \
+            f"{round(lead_time.average_lead_time)} days average " \
             f"over {lead_time.number_of_releases} releases"
 
         # Generate monthly lead time report
