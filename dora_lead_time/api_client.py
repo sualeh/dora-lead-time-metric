@@ -118,7 +118,7 @@ def raise_if_rate_limit_error(
 def raise_if_api_error(
     response: requests.Response, source: ApiSource
 ) -> None:
-    """Raise ApiError for any unrecoverable non-2xx response.
+    """Raise ApiError for any unrecoverable 4xx/5xx response.
 
     Intended for structural, list-based requests where a failure means the
     entire operation cannot proceed. Call this after ``raise_if_auth_error``
