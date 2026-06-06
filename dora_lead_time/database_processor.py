@@ -14,6 +14,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+class DatabaseOperationError(Exception):
+    """Raised when a database read or write operation fails unrecoverably."""
+
+
 class DatabaseProcessor:
     """Database operations to create releases database."""
 
@@ -126,6 +130,11 @@ class DatabaseProcessor:
                 """,
                 e
             )
+            if conn:
+                conn.rollback()
+            raise DatabaseOperationError(
+                "Could not retrieve projects from the database"
+            ) from e
         finally:
             if conn:
                 conn.close()
@@ -180,6 +189,9 @@ class DatabaseProcessor:
                 """,
                 e
             )
+            if conn:
+                conn.rollback()
+            raise DatabaseOperationError("Could not create schema") from e
         finally:
             if conn:
                 conn.close()
@@ -226,6 +238,9 @@ class DatabaseProcessor:
                 """,
                 e
             )
+            if conn:
+                conn.rollback()
+            raise DatabaseOperationError("Could not save projects") from e
         finally:
             if conn:
                 conn.close()
@@ -272,6 +287,11 @@ class DatabaseProcessor:
 
         except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
             logger.error("Database error while updating project types: %s", e)
+            if conn:
+                conn.rollback()
+            raise DatabaseOperationError(
+                "Could not update project types"
+            ) from e
         finally:
             if conn:
                 conn.close()
@@ -299,6 +319,12 @@ class DatabaseProcessor:
 
             conn = self._get_connection()
             cursor = conn.cursor()
+
+            cursor.execute(
+                """
+                DROP TABLE IF EXISTS stage_releases
+                """
+            )
 
             cursor.execute(
                 """
@@ -373,6 +399,9 @@ class DatabaseProcessor:
                 """,
                 e
             )
+            if conn:
+                conn.rollback()
+            raise DatabaseOperationError("Could not save releases") from e
         finally:
             if conn:
                 conn.close()
@@ -421,6 +450,11 @@ class DatabaseProcessor:
                 e
             )
             release_ids = []
+            if conn:
+                conn.rollback()
+            raise DatabaseOperationError(
+                "Could not get releases without stories"
+            ) from e
         finally:
             if conn:
                 conn.close()
@@ -447,6 +481,12 @@ class DatabaseProcessor:
 
             conn = self._get_connection()
             cursor = conn.cursor()
+
+            cursor.execute(
+                """
+                DROP TABLE IF EXISTS stage_stories
+                """
+            )
 
             cursor.execute(
                 """
@@ -523,6 +563,9 @@ class DatabaseProcessor:
                 """,
                 e
             )
+            if conn:
+                conn.rollback()
+            raise DatabaseOperationError("Could not save stories") from e
         finally:
             if conn:
                 conn.close()
@@ -574,6 +617,11 @@ class DatabaseProcessor:
                 e
             )
             story_keys = []
+            if conn:
+                conn.rollback()
+            raise DatabaseOperationError(
+                "Could not load stories without pull requests"
+            ) from e
         finally:
             if conn:
                 conn.close()
@@ -621,6 +669,12 @@ class DatabaseProcessor:
 
             conn = self._get_connection()
             cursor = conn.cursor()
+
+            cursor.execute(
+                """
+                DROP TABLE IF EXISTS stage_stories_pull_requests
+                """
+            )
 
             cursor.execute(
                 """
@@ -725,6 +779,11 @@ class DatabaseProcessor:
                 """,
                 e
             )
+            if conn:
+                conn.rollback()
+            raise DatabaseOperationError(
+                "Could not save stories to PR URL mapping"
+            ) from e
         finally:
             if conn:
                 conn.close()
@@ -785,6 +844,11 @@ class DatabaseProcessor:
                 e
             )
             pull_requests = []
+            if conn:
+                conn.rollback()
+            raise DatabaseOperationError(
+                "Could not load PRs from the database"
+            ) from e
         finally:
             if conn:
                 # Close the connection
@@ -855,6 +919,11 @@ class DatabaseProcessor:
                 """,
                 e
             )
+            if conn:
+                conn.rollback()
+            raise DatabaseOperationError(
+                "Could not update PR details"
+            ) from e
         finally:
             if conn:
                 conn.close()
@@ -931,6 +1000,8 @@ class DatabaseProcessor:
 
         except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
             logger.error("Failed to retrieve summary data: %s", e)
+            if conn:
+                conn.rollback()
         finally:
             if conn:
                 conn.close()

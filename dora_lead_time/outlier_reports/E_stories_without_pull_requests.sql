@@ -1,4 +1,6 @@
 -- database: ../../releases.2024-07.2025-03.db
+-- Lookback window: 60 days — a two-month rolling window captures recently
+-- closed releases and their associated stories and pull requests.
 SELECT DISTINCT
   stories.id AS story_id,
   projects.project_key,

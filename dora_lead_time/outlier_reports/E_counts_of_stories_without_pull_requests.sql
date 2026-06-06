@@ -1,13 +1,23 @@
 -- database: ../../releases.2024-07.2025-03.db
+-- Lookback window: 60 days — a two-month rolling window captures recently
+-- closed releases and their associated stories and pull requests.
 WITH project_story_counts AS (
   SELECT
     projects.project_key,
-    MIN(COUNT(stories.id), COUNT(CASE WHEN pull_requests.id IS NOT NULL THEN 1 END))
+    COUNT(DISTINCT stories.id)
+      AS total_stories,
+    COUNT(DISTINCT
+      CASE WHEN pull_requests.id IS NOT NULL
+        THEN stories.id
+      END
+    )
       AS stories_with_prs,
-    MIN(COUNT(stories.id), COUNT(CASE WHEN pull_requests.id IS NULL THEN 1 END))
-      AS stories_without_prs,
-    COUNT(stories.id)
-          AS total_stories
+    COUNT(DISTINCT
+      CASE WHEN pull_requests.id IS NULL
+        THEN stories.id
+      END
+    )
+      AS stories_without_prs
   FROM
     projects
     LEFT JOIN releases
@@ -23,7 +33,7 @@ WITH project_story_counts AS (
   GROUP BY
     projects.project_key
   HAVING
-    COUNT(stories.id) > 0
+    COUNT(DISTINCT stories.id) > 0
 )
 SELECT
   p.project_key,
@@ -33,8 +43,15 @@ SELECT
   COALESCE(s.total_stories, 0)
       AS total_stories,
   CASE
-    WHEN COALESCE(s.total_stories, 0) = 0 THEN 0.0
-    ELSE CAST(ROUND((COALESCE(s.stories_without_prs, 0) * 100.0 / COALESCE(s.total_stories, 0)), 0) AS INTEGER)
+    WHEN COALESCE(s.total_stories, 0) = 0
+      THEN 0.0
+      ELSE CAST(
+        ROUND(
+        (
+          COALESCE(s.stories_without_prs, 0) * 100.0 /
+          COALESCE(s.total_stories, 0)
+        ), 0)
+        AS INTEGER)
   END
       AS percentage_stories_without_prs
 FROM

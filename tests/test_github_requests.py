@@ -8,16 +8,18 @@ from datetime import date, datetime
 from unittest.mock import patch, MagicMock
 
 from dora_lead_time.github_requests import GitHubRequests
+from dora_lead_time.api_client import AuthError, RateLimitError
 from dora_lead_time.models import PullRequestIdentifier, PullRequest
 
 
 class MockResponse:
     """Mock response for requests."""
 
-    def __init__(self, json_data, status_code=200):
+    def __init__(self, json_data, status_code=200, headers=None):
         self.json_data = json_data
         self.status_code = status_code
         self.text = json.dumps(json_data)
+        self.headers = headers or {}
 
     def json(self):
         """Return JSON data."""
@@ -132,11 +134,9 @@ def test_get_pull_request_details(mock_get, github_client):
 
 @patch("requests.get")
 def test_get_pull_request_details_api_error(mock_get, github_client):
-    """Test handling API errors when getting pull request details."""
-    # Mock failed API response
+    """Test that non-auth HTTP errors on PR details skip the PR gracefully."""
     mock_get.return_value = MockResponse({}, 404)
 
-    # Test data
     pull_requests = [
         PullRequestIdentifier(
             id=1,
@@ -146,35 +146,29 @@ def test_get_pull_request_details_api_error(mock_get, github_client):
         )
     ]
 
-    # Call the method
     result = github_client.get_pull_request_details(pull_requests)
 
-    # Should return empty list
+    # Single-item failure is skipped; result is empty
     assert len(result) == 0
 
 
 @patch("requests.get")
 def test_get_pull_request_details_commits_error(mock_get, github_client):
-    """Test handling errors when getting commit details."""
-    # Mock PR data success but commits failure
+    """Test that HTTP errors on the commits endpoint yield empty commit data."""
     mock_pr_data = {
         "title": "Test PR",
         "created_at": "2023-01-01T10:00:00Z",
         "closed_at": "2023-01-02T15:30:00Z",
     }
 
-    # Configure the mock to return success for PR but fail for commits
     def side_effect(*args, **kwargs):
         url = args[0]
         if "pulls/123" in url and "/commits" not in url:
             return MockResponse(mock_pr_data)
-        elif "pulls/123/commits" in url:
-            return MockResponse({}, 404)
         return MockResponse({}, 404)
 
     mock_get.side_effect = side_effect
 
-    # Test data
     pull_requests = [
         PullRequestIdentifier(
             id=1,
@@ -184,10 +178,9 @@ def test_get_pull_request_details_commits_error(mock_get, github_client):
         )
     ]
 
-    # Call the method
     result = github_client.get_pull_request_details(pull_requests)
 
-    # Should still return the PR but with empty commit data
+    # PR is still recorded, but with empty commit data
     assert len(result) == 1
     pr = result[0]
     assert pr.commit_count == 0
@@ -238,3 +231,107 @@ def test_get_pull_request_details_missing_token_for_org(mock_get, github_client)
     # Should return empty list since org has no token
     assert len(result) == 0
     assert mock_get.call_count == 0  # No API calls made
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+@patch("requests.get")
+def test_get_pull_request_details_auth_error(
+    mock_get, status_code, github_client
+):
+    """Test that 401/403 responses raise AuthError."""
+    mock_get.return_value = MockResponse({}, status_code)
+
+    pull_requests = [
+        PullRequestIdentifier(
+            id=1,
+            pr_owner="Org1",
+            pr_repository="test-repo",
+            pr_number="123"
+        )
+    ]
+
+    with pytest.raises(AuthError):
+        github_client.get_pull_request_details(pull_requests)
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+@patch("requests.get")
+def test_get_pull_request_commits_auth_error(
+    mock_get, status_code, github_client
+):
+    """Test that 401/403 on commits endpoint raises AuthError."""
+    mock_pr_data = {
+        "title": "Test PR",
+        "created_at": "2023-01-01T10:00:00Z",
+        "closed_at": "2023-01-02T15:30:00Z",
+    }
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if "pulls/123" in url and "/commits" not in url:
+            return MockResponse(mock_pr_data)
+        return MockResponse({}, status_code)
+
+    mock_get.side_effect = side_effect
+
+    pull_requests = [
+        PullRequestIdentifier(
+            id=1,
+            pr_owner="Org1",
+            pr_repository="test-repo",
+            pr_number="123"
+        )
+    ]
+
+    with pytest.raises(AuthError):
+        github_client.get_pull_request_details(pull_requests)
+
+
+@patch("requests.get")
+def test_get_pull_request_details_rate_limit_error(mock_get, github_client):
+    """Test that a 429 response on PR details raises RateLimitError."""
+    mock_get.return_value = MockResponse(
+        {}, 429, headers={"x-ratelimit-reset": "9999999999"}
+    )
+
+    pull_requests = [
+        PullRequestIdentifier(
+            id=1,
+            pr_owner="Org1",
+            pr_repository="test-repo",
+            pr_number="123"
+        )
+    ]
+
+    with pytest.raises(RateLimitError):
+        github_client.get_pull_request_details(pull_requests)
+
+
+@patch("requests.get")
+def test_get_pull_request_commits_rate_limit_error(mock_get, github_client):
+    """Test that a 429 on the commits endpoint raises RateLimitError."""
+    mock_pr_data = {
+        "title": "Test PR",
+        "created_at": "2023-01-01T10:00:00Z",
+        "closed_at": "2023-01-02T15:30:00Z",
+    }
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if "pulls/123" in url and "/commits" not in url:
+            return MockResponse(mock_pr_data)
+        return MockResponse({}, 429, headers={"Retry-After": "30"})
+
+    mock_get.side_effect = side_effect
+
+    pull_requests = [
+        PullRequestIdentifier(
+            id=1,
+            pr_owner="Org1",
+            pr_repository="test-repo",
+            pr_number="123"
+        )
+    ]
+
+    with pytest.raises(RateLimitError):
+        github_client.get_pull_request_details(pull_requests)
