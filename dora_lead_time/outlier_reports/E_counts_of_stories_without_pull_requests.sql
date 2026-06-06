@@ -6,11 +6,17 @@ WITH project_story_counts AS (
     projects.project_key,
     COUNT(DISTINCT stories.id)
       AS total_stories,
-    COUNT(DISTINCT CASE WHEN pull_requests.id IS NOT NULL
-                        THEN stories.id END)
+    COUNT(DISTINCT
+      CASE WHEN pull_requests.id IS NOT NULL
+        THEN stories.id
+      END
+    )
       AS stories_with_prs,
-    COUNT(DISTINCT CASE WHEN pull_requests.id IS NULL
-                        THEN stories.id END)
+    COUNT(DISTINCT
+      CASE WHEN pull_requests.id IS NULL
+        THEN stories.id
+      END
+    )
       AS stories_without_prs
   FROM
     projects
@@ -37,9 +43,15 @@ SELECT
   COALESCE(s.total_stories, 0)
       AS total_stories,
   CASE
-    WHEN COALESCE(s.total_stories, 0) = 0 THEN 0.0
-    ELSE CAST(ROUND((COALESCE(s.stories_without_prs, 0) * 100.0 /
-                     COALESCE(s.total_stories, 0)), 0) AS INTEGER)
+    WHEN COALESCE(s.total_stories, 0) = 0
+      THEN 0.0
+      ELSE CAST(
+        ROUND(
+        (
+          COALESCE(s.stories_without_prs, 0) * 100.0 /
+          COALESCE(s.total_stories, 0)
+        ), 0)
+        AS INTEGER)
   END
       AS percentage_stories_without_prs
 FROM
