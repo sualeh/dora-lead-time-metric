@@ -134,11 +134,9 @@ def test_get_pull_request_details(mock_get, github_client):
 
 @patch("requests.get")
 def test_get_pull_request_details_api_error(mock_get, github_client):
-    """Test handling API errors when getting pull request details."""
-    # Mock failed API response
+    """Test that non-auth HTTP errors on PR details skip the PR gracefully."""
     mock_get.return_value = MockResponse({}, 404)
 
-    # Test data
     pull_requests = [
         PullRequestIdentifier(
             id=1,
@@ -148,35 +146,29 @@ def test_get_pull_request_details_api_error(mock_get, github_client):
         )
     ]
 
-    # Call the method
     result = github_client.get_pull_request_details(pull_requests)
 
-    # Should return empty list
+    # Single-item failure is skipped; result is empty
     assert len(result) == 0
 
 
 @patch("requests.get")
 def test_get_pull_request_details_commits_error(mock_get, github_client):
-    """Test handling errors when getting commit details."""
-    # Mock PR data success but commits failure
+    """Test that HTTP errors on the commits endpoint yield empty commit data."""
     mock_pr_data = {
         "title": "Test PR",
         "created_at": "2023-01-01T10:00:00Z",
         "closed_at": "2023-01-02T15:30:00Z",
     }
 
-    # Configure the mock to return success for PR but fail for commits
     def side_effect(*args, **kwargs):
         url = args[0]
         if "pulls/123" in url and "/commits" not in url:
             return MockResponse(mock_pr_data)
-        elif "pulls/123/commits" in url:
-            return MockResponse({}, 404)
         return MockResponse({}, 404)
 
     mock_get.side_effect = side_effect
 
-    # Test data
     pull_requests = [
         PullRequestIdentifier(
             id=1,
@@ -186,10 +178,9 @@ def test_get_pull_request_details_commits_error(mock_get, github_client):
         )
     ]
 
-    # Call the method
     result = github_client.get_pull_request_details(pull_requests)
 
-    # Should still return the PR but with empty commit data
+    # PR is still recorded, but with empty commit data
     assert len(result) == 1
     pr = result[0]
     assert pr.commit_count == 0

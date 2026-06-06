@@ -11,7 +11,7 @@ from typing import NamedTuple
 from dotenv import load_dotenv
 from dora_lead_time.database_processor import DatabaseProcessor
 from dora_lead_time.atlassian_requests import AtlassianRequests
-from dora_lead_time.exceptions import AuthError, RateLimitError
+from dora_lead_time.exceptions import ApiError, AuthError, RateLimitError
 from dora_lead_time.github_requests import GitHubRequests
 from dora_lead_time.outlier_reports import OutlierReports
 from dora_lead_time.lead_time_report import LeadTimeReport
@@ -423,8 +423,8 @@ def main():
     if build_database:
         try:
             create_releases_database(config)
-        except (AuthError, RateLimitError) as e:
-            logger.error("Authentication error: %s", e)
+        except (ApiError, AuthError, RateLimitError) as e:
+            logger.error("API error: %s", e)
             sys.exit(1)
 
     # Generate reports if flag is set

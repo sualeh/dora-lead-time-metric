@@ -32,6 +32,14 @@ class RateLimitError(Exception):
     """
 
 
+class ApiError(Exception):
+    """Raised when a structural API request fails with an unrecoverable error.
+
+    Attributes:
+        message: Explanation of what request failed and the HTTP status code.
+    """
+
+
 def raise_if_auth_error(
     response: requests.Response, source: ApiSource
 ) -> None:
@@ -105,3 +113,27 @@ def raise_if_rate_limit_error(
     raise RateLimitError(
         f"Rate limit exceeded for {source.value}. {retry_message}"
     )
+
+
+def raise_if_api_error(
+    response: requests.Response, source: ApiSource
+) -> None:
+    """Raise ApiError for any unrecoverable non-2xx response.
+
+    Intended for structural, list-based requests where a failure means the
+    entire operation cannot proceed. Call this after ``raise_if_auth_error``
+    and ``raise_if_rate_limit_error`` have already been invoked so that 401,
+    403, and 429 responses are handled by their dedicated helpers.
+
+    Args:
+        response: The HTTP response to inspect.
+        source: The API source that returned the response.
+
+    Raises:
+        ApiError: If the response status code is 400 or higher.
+    """
+    if response.status_code >= 400:
+        raise ApiError(
+            f"{source.value} API request failed "
+            f"(HTTP {response.status_code})."
+        )
