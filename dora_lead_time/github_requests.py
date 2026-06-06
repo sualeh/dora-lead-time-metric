@@ -4,9 +4,8 @@ import logging
 import os
 from datetime import datetime
 
-import requests
 from dotenv import load_dotenv
-from dora_lead_time.exceptions import ApiSource, raise_if_auth_error, raise_if_rate_limit_error
+from dora_lead_time.api_client import ApiSource, api_get
 from dora_lead_time.models import PullRequestIdentifier, PullRequest
 
 logging.basicConfig(
@@ -91,14 +90,9 @@ class GitHubRequests:
             headers = {"Authorization": f"token {github_token}"}
 
             api_url = f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}"
-            response = requests.get(
-                api_url, headers=headers, timeout=self.request_timeout
-            )
-            raise_if_auth_error(
-                response, ApiSource.GITHUB
-            )
-            raise_if_rate_limit_error(
-                response, ApiSource.GITHUB
+            response = api_get(
+                api_url, ApiSource.GITHUB, raise_on_error=False,
+                headers=headers, timeout=self.request_timeout,
             )
             if response.status_code != 200:
                 logger.warning(
@@ -119,14 +113,9 @@ class GitHubRequests:
 
             # Get commit data
             commits_url = f"{api_url}/commits"
-            commits_response = requests.get(
-                commits_url, headers=headers, timeout=self.request_timeout
-            )
-            raise_if_auth_error(
-                commits_response, ApiSource.GITHUB
-            )
-            raise_if_rate_limit_error(
-                commits_response, ApiSource.GITHUB
+            commits_response = api_get(
+                commits_url, ApiSource.GITHUB, raise_on_error=False,
+                headers=headers, timeout=self.request_timeout,
             )
             if commits_response.status_code != 200:
                 logger.warning(

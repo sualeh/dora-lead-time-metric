@@ -11,7 +11,7 @@ from typing import NamedTuple
 from dotenv import load_dotenv
 from dora_lead_time.database_processor import DatabaseProcessor
 from dora_lead_time.atlassian_requests import AtlassianRequests
-from dora_lead_time.exceptions import ApiError, AuthError, RateLimitError
+from dora_lead_time.api_client import ApiError, AuthError, RateLimitError
 from dora_lead_time.github_requests import GitHubRequests
 from dora_lead_time.outlier_reports import OutlierReports
 from dora_lead_time.lead_time_report import LeadTimeReport

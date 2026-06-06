@@ -1,4 +1,4 @@
-"""Custom exceptions and shared error-handling helpers."""
+"""API client utilities: custom exceptions, error-checking helpers, and HTTP GET."""
 
 import enum
 import logging
@@ -137,3 +137,50 @@ def raise_if_api_error(
             f"{source.value} API request failed "
             f"(HTTP {response.status_code})."
         )
+
+
+def api_get(
+    url: str,
+    source: ApiSource,
+    *,
+    raise_on_error: bool = True,
+    **kwargs,
+) -> requests.Response:
+    """Make a GET request with standard error checking.
+
+    Always raises ``AuthError`` on 401/403 and ``RateLimitError`` on 429.
+
+    When *raise_on_error* is ``True`` (the default), also raises ``ApiError``
+    for any remaining non-2xx response — use this for structural or
+    list-based requests where a failure means the entire operation cannot
+    proceed.
+
+    When *raise_on_error* is ``False``, returns the response as-is so the
+    caller can inspect ``status_code``, log a meaningful message, and skip
+    the individual item.
+
+    Args:
+        url: The URL to GET.
+        source: The API source, used in error messages.
+        raise_on_error: If ``True``, raise ``ApiError`` for any non-2xx
+            response not already handled by ``raise_if_auth_error`` or
+            ``raise_if_rate_limit_error``. If ``False``, return the response
+            regardless of status code.
+        **kwargs: Forwarded to ``requests.get()`` (e.g. ``headers``,
+            ``auth``, ``timeout``).
+
+    Returns:
+        The HTTP response.
+
+    Raises:
+        AuthError: If the response status is 401 or 403.
+        RateLimitError: If the response status is 429.
+        ApiError: If the response status is >= 400 and *raise_on_error*
+            is ``True``.
+    """
+    response = requests.get(url, **kwargs)
+    raise_if_auth_error(response, source)
+    raise_if_rate_limit_error(response, source)
+    if raise_on_error:
+        raise_if_api_error(response, source)
+    return response

@@ -8,7 +8,7 @@ from datetime import date, datetime
 from unittest.mock import patch, MagicMock
 
 from dora_lead_time.github_requests import GitHubRequests
-from dora_lead_time.exceptions import AuthError, RateLimitError
+from dora_lead_time.api_client import AuthError, RateLimitError
 from dora_lead_time.models import PullRequestIdentifier, PullRequest
 
 

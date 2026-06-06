@@ -1,14 +1,15 @@
-"""Unit tests for exceptions and error-handling helpers."""
+"""Unit tests for api_client: exceptions, error-checking helpers, and api_get."""
 
 import time
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
-from dora_lead_time.exceptions import (
+from dora_lead_time.api_client import (
     ApiSource,
     ApiError,
     AuthError,
     RateLimitError,
+    api_get,
     raise_if_api_error,
     raise_if_auth_error,
     raise_if_rate_limit_error,
@@ -158,3 +159,94 @@ def test_raise_if_api_error_no_raise(status_code):
     """2xx responses do not raise ApiError."""
     response = _mock_response(status_code)
     raise_if_api_error(response, ApiSource.GITHUB)  # should not raise
+
+
+# ---------------------------------------------------------------------------
+# api_get
+# ---------------------------------------------------------------------------
+
+def _patched_get(mock_response):
+    """Return a context manager that patches requests.get with mock_response."""
+    return patch("dora_lead_time.api_client.requests.get", return_value=mock_response)
+
+
+def test_api_get_200_returns_response():
+    """200 response is returned when raise_on_error is True (default)."""
+    mock = _mock_response(200)
+    with _patched_get(mock):
+        result = api_get("https://example.com", ApiSource.GITHUB)
+    assert result is mock
+
+
+def test_api_get_200_raise_on_error_false_returns_response():
+    """200 response is returned when raise_on_error is False."""
+    mock = _mock_response(200)
+    with _patched_get(mock):
+        result = api_get(
+            "https://example.com", ApiSource.GITHUB, raise_on_error=False
+        )
+    assert result is mock
+
+
+def test_api_get_401_raises_auth_error():
+    """401 response raises AuthError regardless of raise_on_error."""
+    mock = _mock_response(401)
+    with _patched_get(mock):
+        with pytest.raises(AuthError):
+            api_get("https://example.com", ApiSource.GITHUB)
+
+
+def test_api_get_401_raise_on_error_false_raises_auth_error():
+    """401 response raises AuthError even when raise_on_error is False."""
+    mock = _mock_response(401)
+    with _patched_get(mock):
+        with pytest.raises(AuthError):
+            api_get(
+                "https://example.com", ApiSource.GITHUB, raise_on_error=False
+            )
+
+
+def test_api_get_429_raises_rate_limit_error():
+    """429 response raises RateLimitError regardless of raise_on_error."""
+    mock = _mock_response(429)
+    with _patched_get(mock):
+        with pytest.raises(RateLimitError):
+            api_get("https://example.com", ApiSource.GITHUB)
+
+
+def test_api_get_500_raise_on_error_true_raises_api_error():
+    """500 response raises ApiError when raise_on_error is True (default)."""
+    mock = _mock_response(500)
+    with _patched_get(mock):
+        with pytest.raises(ApiError):
+            api_get("https://example.com", ApiSource.ATLASSIAN)
+
+
+def test_api_get_500_raise_on_error_false_returns_response():
+    """500 response is returned (not raised) when raise_on_error is False."""
+    mock = _mock_response(500)
+    with _patched_get(mock):
+        result = api_get(
+            "https://example.com", ApiSource.ATLASSIAN, raise_on_error=False
+        )
+    assert result is mock
+    assert result.status_code == 500
+
+
+def test_api_get_forwards_kwargs():
+    """Extra keyword arguments are forwarded to requests.get."""
+    mock = _mock_response(200)
+    with patch(
+        "dora_lead_time.api_client.requests.get", return_value=mock
+    ) as mock_get:
+        api_get(
+            "https://example.com",
+            ApiSource.GITHUB,
+            headers={"Authorization": "token abc"},
+            timeout=10,
+        )
+    mock_get.assert_called_once_with(
+        "https://example.com",
+        headers={"Authorization": "token abc"},
+        timeout=10,
+    )
