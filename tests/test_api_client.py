@@ -174,7 +174,7 @@ def test_api_get_200_returns_response():
     """200 response is returned when raise_on_error is True (default)."""
     mock = _mock_response(200)
     with _patched_get(mock):
-        result = api_get("https://example.com", ApiSource.GITHUB)
+        result = api_get("https://example.com", ApiSource.GITHUB, {})
     assert result is mock
 
 
@@ -183,7 +183,7 @@ def test_api_get_200_raise_on_error_false_returns_response():
     mock = _mock_response(200)
     with _patched_get(mock):
         result = api_get(
-            "https://example.com", ApiSource.GITHUB, raise_on_error=False
+            "https://example.com", ApiSource.GITHUB, {}, raise_on_error=False
         )
     assert result is mock
 
@@ -193,7 +193,7 @@ def test_api_get_401_raises_auth_error():
     mock = _mock_response(401)
     with _patched_get(mock):
         with pytest.raises(AuthError):
-            api_get("https://example.com", ApiSource.GITHUB)
+            api_get("https://example.com", ApiSource.GITHUB, {})
 
 
 def test_api_get_401_raise_on_error_false_raises_auth_error():
@@ -202,7 +202,7 @@ def test_api_get_401_raise_on_error_false_raises_auth_error():
     with _patched_get(mock):
         with pytest.raises(AuthError):
             api_get(
-                "https://example.com", ApiSource.GITHUB, raise_on_error=False
+                "https://example.com", ApiSource.GITHUB, {}, raise_on_error=False
             )
 
 
@@ -211,7 +211,7 @@ def test_api_get_429_raises_rate_limit_error():
     mock = _mock_response(429)
     with _patched_get(mock):
         with pytest.raises(RateLimitError):
-            api_get("https://example.com", ApiSource.GITHUB)
+            api_get("https://example.com", ApiSource.GITHUB, {})
 
 
 def test_api_get_500_raise_on_error_true_raises_api_error():
@@ -219,7 +219,7 @@ def test_api_get_500_raise_on_error_true_raises_api_error():
     mock = _mock_response(500)
     with _patched_get(mock):
         with pytest.raises(ApiError):
-            api_get("https://example.com", ApiSource.ATLASSIAN)
+            api_get("https://example.com", ApiSource.ATLASSIAN, {})
 
 
 def test_api_get_500_raise_on_error_false_returns_response():
@@ -227,14 +227,14 @@ def test_api_get_500_raise_on_error_false_returns_response():
     mock = _mock_response(500)
     with _patched_get(mock):
         result = api_get(
-            "https://example.com", ApiSource.ATLASSIAN, raise_on_error=False
+            "https://example.com", ApiSource.ATLASSIAN, {}, raise_on_error=False
         )
     assert result is mock
     assert result.status_code == 500
 
 
-def test_api_get_forwards_kwargs():
-    """Extra keyword arguments are forwarded to requests.get."""
+def test_api_get_passes_arguments_to_requests():
+    """All parameters are forwarded correctly to requests.get."""
     mock = _mock_response(200)
     with patch(
         "dora_lead_time.api_client.requests.get", return_value=mock
@@ -242,11 +242,13 @@ def test_api_get_forwards_kwargs():
         api_get(
             "https://example.com",
             ApiSource.GITHUB,
-            headers={"Authorization": "token abc"},
+            {"Authorization": "token abc"},
             timeout=10,
         )
     mock_get.assert_called_once_with(
         "https://example.com",
         headers={"Authorization": "token abc"},
+        auth=None,
+        params=None,
         timeout=10,
     )
