@@ -1,3 +1,5 @@
+-- Lookback window: 60 days — a two-month rolling window captures recently
+-- closed releases and their associated stories and pull requests.
 SELECT
   stories.story_key,
   stories.story_title,
@@ -6,7 +8,7 @@ SELECT
   pull_requests.earliest_commit_date,
   pull_requests.pr_open AS pr_created_date,
   pull_requests.pr_close AS pr_closed_date,
-  julianday(releases.release_date) - julianday(pull_requests.earliest_commit_date) + 1
+  julianday(releases.release_date) - julianday(pull_requests.earliest_commit_date)
     AS lead_time,
   CASE
     WHEN pull_requests.earliest_commit_date > releases.release_date THEN 'Earliest commit after release'

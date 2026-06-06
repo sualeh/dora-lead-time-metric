@@ -4,8 +4,8 @@ import logging
 import os
 from datetime import datetime
 
-import requests
 from dotenv import load_dotenv
+from dora_lead_time.api_client import ApiSource, api_get
 from dora_lead_time.models import PullRequestIdentifier, PullRequest
 
 logging.basicConfig(
@@ -90,13 +90,14 @@ class GitHubRequests:
             headers = {"Authorization": f"token {github_token}"}
 
             api_url = f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}"
-            response = requests.get(
-                api_url, headers=headers, timeout=self.request_timeout
+            response = api_get(
+                api_url, ApiSource.GITHUB, headers,
+                timeout=self.request_timeout, raise_on_error=False,
             )
             if response.status_code != 200:
-                logger.error(
-                    "ERROR: Could not fetch PR details for: "
-                    "%s/%s/%s. Status code: %s",
+                logger.warning(
+                    "Could not fetch PR details for %s/%s/%s "
+                    "(HTTP %s); skipping",
                     owner, repo, pr_number, response.status_code
                 )
                 continue
@@ -112,10 +113,16 @@ class GitHubRequests:
 
             # Get commit data
             commits_url = f"{api_url}/commits"
-            commits_response = requests.get(
-                commits_url, headers=headers, timeout=self.request_timeout
+            commits_response = api_get(
+                commits_url, ApiSource.GITHUB, headers,
+                timeout=self.request_timeout, raise_on_error=False,
             )
             if commits_response.status_code != 200:
+                logger.warning(
+                    "Could not fetch commits for PR %s/%s/%s "
+                    "(HTTP %s); commit data will be empty",
+                    owner, repo, pr_number, commits_response.status_code
+                )
                 commits = []
             else:
                 commits = commits_response.json()

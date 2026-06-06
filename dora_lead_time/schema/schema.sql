@@ -76,6 +76,9 @@ CREATE TABLE IF NOT EXISTS stories_pull_request_counts (
 DROP VIEW IF EXISTS lead_times;
 
 CREATE VIEW lead_times AS
+-- Stories without any associated pull request are excluded by design:
+-- lead time is measured via commits, so only stories linked to at least
+-- one PR contribute to the metric.
 SELECT
 	releases.id
 	AS release_id,
@@ -89,7 +92,7 @@ SELECT
 	pull_requests.pr_number,
 	pull_requests.earliest_commit_date,
 	julianday(releases.release_date) -
-	  julianday(pull_requests.earliest_commit_date) + 1
+	  julianday(pull_requests.earliest_commit_date)
 	  AS lead_time
 FROM
 	releases
