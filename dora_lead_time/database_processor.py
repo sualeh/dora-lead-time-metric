@@ -310,6 +310,12 @@ class DatabaseProcessor:
 
             cursor.execute(
                 """
+                DROP TABLE IF EXISTS stage_releases
+                """
+            )
+
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS stage_releases (
                     release_internal_id VARCHAR(1024),
                     release_title VARCHAR(1024),
@@ -459,6 +465,12 @@ class DatabaseProcessor:
 
             conn = self._get_connection()
             cursor = conn.cursor()
+
+            cursor.execute(
+                """
+                DROP TABLE IF EXISTS stage_stories
+                """
+            )
 
             cursor.execute(
                 """
@@ -637,6 +649,12 @@ class DatabaseProcessor:
 
             conn = self._get_connection()
             cursor = conn.cursor()
+
+            cursor.execute(
+                """
+                DROP TABLE IF EXISTS stage_stories_pull_requests
+                """
+            )
 
             cursor.execute(
                 """
