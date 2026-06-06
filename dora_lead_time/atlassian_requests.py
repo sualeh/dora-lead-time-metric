@@ -75,8 +75,8 @@ class AtlassianRequests:
         auth = (self.email, self.token)
         projects_url = f"https://{self.jira_instance}/rest/api/3/project"
         response = api_get(
-            projects_url, ApiSource.ATLASSIAN,
-            headers=headers, auth=auth, timeout=self.request_timeout,
+            projects_url, ApiSource.ATLASSIAN, headers,
+            auth=auth, timeout=self.request_timeout,
         )
 
         all_projects = response.json()
@@ -117,8 +117,8 @@ class AtlassianRequests:
         auth = (self.email, self.token)
         projects_url = f"https://{self.jira_instance}/rest/api/3/project"
         response = api_get(
-            projects_url, ApiSource.ATLASSIAN,
-            headers=headers, auth=auth, timeout=self.request_timeout,
+            projects_url, ApiSource.ATLASSIAN, headers,
+            auth=auth, timeout=self.request_timeout,
         )
 
         all_projects = response.json()
@@ -132,8 +132,9 @@ class AtlassianRequests:
         for project_key in project_keys:
             url = f"{projects_url}/{project_key}/versions"
             response = api_get(
-                url, ApiSource.ATLASSIAN, raise_on_error=False,
-                headers=headers, auth=auth, timeout=self.request_timeout,
+                url, ApiSource.ATLASSIAN, headers,
+                auth=auth, timeout=self.request_timeout,
+                raise_on_error=False,
             )
             if response.status_code != 200:
                 logger.warning(
@@ -226,9 +227,8 @@ class AtlassianRequests:
 
             logger.info("Fetching stories batch starting at %s", start_at)
             response = api_get(
-                url, ApiSource.ATLASSIAN,
-                headers=headers, auth=auth, params=params,
-                timeout=self.request_timeout,
+                url, ApiSource.ATLASSIAN, headers,
+                auth=auth, params=params, timeout=self.request_timeout,
             )
 
             data = response.json()
@@ -335,8 +335,9 @@ class AtlassianRequests:
                 f"https://{self.jira_instance}/rest/api/3/issue/{story}?fields=id"
             )
             issue_response = api_get(
-                issue_url, ApiSource.ATLASSIAN, raise_on_error=False,
-                headers=headers, auth=auth, timeout=self.request_timeout,
+                issue_url, ApiSource.ATLASSIAN, headers,
+                auth=auth, timeout=self.request_timeout,
+                raise_on_error=False,
             )
 
             if issue_response.status_code != 200:
@@ -360,8 +361,9 @@ class AtlassianRequests:
                 f"&dataType=pullrequest"
             )
             dev_response = api_get(
-                dev_url, ApiSource.ATLASSIAN, raise_on_error=False,
-                headers=headers, auth=auth, timeout=self.request_timeout,
+                dev_url, ApiSource.ATLASSIAN, headers,
+                auth=auth, timeout=self.request_timeout,
+                raise_on_error=False,
             )
 
             if dev_response.status_code != 200:

@@ -142,9 +142,12 @@ def raise_if_api_error(
 def api_get(
     url: str,
     source: ApiSource,
+    headers: dict[str, str],
     *,
+    auth: tuple[str, str] | None = None,
+    params: dict | None = None,
+    timeout: int = 30,
     raise_on_error: bool = True,
-    **kwargs,
 ) -> requests.Response:
     """Make a GET request with standard error checking.
 
@@ -162,12 +165,14 @@ def api_get(
     Args:
         url: The URL to GET.
         source: The API source, used in error messages.
+        headers: HTTP headers to include in the request.
+        auth: Optional ``(username, password)`` tuple for HTTP Basic Auth.
+        params: Optional query-string parameters to append to the URL.
+        timeout: Request timeout in seconds. Defaults to 30.
         raise_on_error: If ``True``, raise ``ApiError`` for any non-2xx
             response not already handled by ``raise_if_auth_error`` or
             ``raise_if_rate_limit_error``. If ``False``, return the response
             regardless of status code.
-        **kwargs: Forwarded to ``requests.get()`` (e.g. ``headers``,
-            ``auth``, ``timeout``).
 
     Returns:
         The HTTP response.
@@ -178,7 +183,9 @@ def api_get(
         ApiError: If the response status is >= 400 and *raise_on_error*
             is ``True``.
     """
-    response = requests.get(url, **kwargs)
+    response = requests.get(
+        url, headers=headers, auth=auth, params=params, timeout=timeout
+    )
     raise_if_auth_error(response, source)
     raise_if_rate_limit_error(response, source)
     if raise_on_error:

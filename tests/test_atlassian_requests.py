@@ -133,6 +133,7 @@ def test_get_projects(mock_get, atlassian_client):
             "Content-Type": "application/json"
         },
         auth=("test@example.com", "test-token"),
+        params=None,
         timeout=30,
     )
 

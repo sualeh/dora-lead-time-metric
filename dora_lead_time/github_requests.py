@@ -91,8 +91,8 @@ class GitHubRequests:
 
             api_url = f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}"
             response = api_get(
-                api_url, ApiSource.GITHUB, raise_on_error=False,
-                headers=headers, timeout=self.request_timeout,
+                api_url, ApiSource.GITHUB, headers,
+                timeout=self.request_timeout, raise_on_error=False,
             )
             if response.status_code != 200:
                 logger.warning(
@@ -114,8 +114,8 @@ class GitHubRequests:
             # Get commit data
             commits_url = f"{api_url}/commits"
             commits_response = api_get(
-                commits_url, ApiSource.GITHUB, raise_on_error=False,
-                headers=headers, timeout=self.request_timeout,
+                commits_url, ApiSource.GITHUB, headers,
+                timeout=self.request_timeout, raise_on_error=False,
             )
             if commits_response.status_code != 200:
                 logger.warning(
