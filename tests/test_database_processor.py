@@ -4,7 +4,7 @@ import os
 import pytest
 import sqlite3
 from datetime import date, datetime
-from dora_lead_time.database_processor import DatabaseProcessor
+from dora_lead_time.database_processor import DatabaseProcessor, DatabaseOperationError
 from dora_lead_time.models import Project, PullRequestIdentifier, PullRequest
 
 
@@ -191,3 +191,32 @@ def test_save_and_retrieve_pull_request_details(db_processor):
 
     assert result[0] == "Test PR"
     assert result[1] == 3
+
+
+def test_save_projects_raises_on_missing_schema(db_processor):
+    """Test that save_projects raises DatabaseOperationError without schema."""
+    conn = sqlite3.connect(db_processor.sqlite_path)
+    conn.close()
+
+    projects = [Project(None, "P1", "PROJ1", "Project 1", "software")]
+    with pytest.raises(DatabaseOperationError):
+        db_processor.save_projects(projects)
+
+
+def test_retrieve_all_projects_raises_on_missing_table(db_processor):
+    """Test that retrieve_all_projects raises DatabaseOperationError without schema."""
+    conn = sqlite3.connect(db_processor.sqlite_path)
+    conn.close()
+
+    with pytest.raises(DatabaseOperationError):
+        db_processor.retrieve_all_projects()
+
+
+def test_save_releases_raises_on_missing_schema(db_processor):
+    """Test that save_releases raises DatabaseOperationError without schema."""
+    conn = sqlite3.connect(db_processor.sqlite_path)
+    conn.close()
+
+    releases = [(None, "REL-1", "Release 1", "desc", "2024-01-01", "PROJ1")]
+    with pytest.raises(DatabaseOperationError):
+        db_processor.save_releases(releases)
