@@ -1,11 +1,19 @@
 """Custom exceptions and shared error-handling helpers."""
 
+import enum
 import logging
 from datetime import datetime, timezone
 
 import requests
 
 logger = logging.getLogger(__name__)
+
+
+class ApiSource(enum.Enum):
+    """Identifies the external API that a request was made against."""
+
+    GITHUB = "GitHub"
+    ATLASSIAN = "Atlassian"
 
 
 class AuthError(Exception):
@@ -25,28 +33,27 @@ class RateLimitError(Exception):
 
 
 def raise_if_auth_error(
-    response: requests.Response, token_description: str
+    response: requests.Response, source: ApiSource
 ) -> None:
     """Raise AuthError if the response indicates an authentication failure.
 
     Args:
         response: The HTTP response to inspect.
-        token_description: Human-readable description of the credential that
-            was used (e.g. "GitHub token for MyOrg" or "Atlassian token").
+        source: The API source that returned the response.
 
     Raises:
         AuthError: If the response status code is 401 or 403.
     """
     if response.status_code in (401, 403):
         raise AuthError(
-            f"Authentication failed for {token_description} "
+            f"Authentication failed for {source.value} "
             f"(HTTP {response.status_code}). "
             "Please check that your API token is valid and has not expired."
         )
 
 
 def raise_if_rate_limit_error(
-    response: requests.Response, source_description: str
+    response: requests.Response, source: ApiSource
 ) -> None:
     """Raise RateLimitError if the response indicates a rate-limit failure.
 
@@ -56,8 +63,7 @@ def raise_if_rate_limit_error(
 
     Args:
         response: The HTTP response to inspect.
-        source_description: Human-readable description of the API source
-            (e.g. "GitHub API for MyOrg" or "Atlassian API").
+        source: The API source that returned the response.
 
     Raises:
         RateLimitError: If the response status code is 429.
@@ -94,8 +100,8 @@ def raise_if_rate_limit_error(
             retry_message = f"Rate limit reset: {ratelimit_reset}."
 
     logger.error(
-        "Rate limit exceeded for %s. %s", source_description, retry_message
+        "Rate limit exceeded for %s. %s", source.value, retry_message
     )
     raise RateLimitError(
-        f"Rate limit exceeded for {source_description}. {retry_message}"
+        f"Rate limit exceeded for {source.value}. {retry_message}"
     )
