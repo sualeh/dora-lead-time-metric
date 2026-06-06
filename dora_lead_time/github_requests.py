@@ -6,7 +6,7 @@ from datetime import datetime
 
 import requests
 from dotenv import load_dotenv
-from dora_lead_time.exceptions import raise_if_auth_error
+from dora_lead_time.exceptions import raise_if_auth_error, raise_if_rate_limit_error
 from dora_lead_time.models import PullRequestIdentifier, PullRequest
 
 logging.basicConfig(
@@ -97,6 +97,9 @@ class GitHubRequests:
             raise_if_auth_error(
                 response, f"GitHub token for {owner}"
             )
+            raise_if_rate_limit_error(
+                response, f"GitHub API for {owner}"
+            )
             if response.status_code != 200:
                 logger.error(
                     "ERROR: Could not fetch PR details for: "
@@ -121,6 +124,9 @@ class GitHubRequests:
             )
             raise_if_auth_error(
                 commits_response, f"GitHub token for {owner}"
+            )
+            raise_if_rate_limit_error(
+                commits_response, f"GitHub API for {owner}"
             )
             if commits_response.status_code != 200:
                 commits = []

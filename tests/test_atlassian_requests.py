@@ -8,17 +8,18 @@ from datetime import date, datetime
 from unittest.mock import patch, MagicMock
 
 from dora_lead_time.atlassian_requests import AtlassianRequests
-from dora_lead_time.exceptions import AuthError
+from dora_lead_time.exceptions import AuthError, RateLimitError
 from dora_lead_time.models import Project, Release, PullRequestIdentifier
 
 
 class MockResponse:
     """Mock response for requests."""
 
-    def __init__(self, json_data, status_code=200):
+    def __init__(self, json_data, status_code=200, headers=None):
         self.json_data = json_data
         self.status_code = status_code
         self.text = json.dumps(json_data)
+        self.headers = headers or {}
 
     def json(self):
         """Return JSON data."""
@@ -447,3 +448,49 @@ def test_get_story_pull_requests_dev_auth_error(
     with pytest.raises(AuthError):
         atlassian_client.get_story_pull_requests(["TEST-1"])
 
+
+@patch("requests.get")
+def test_get_projects_rate_limit_error(mock_get, atlassian_client):
+    """Test that a 429 on get_projects raises RateLimitError."""
+    mock_get.return_value = MockResponse(
+        {}, 429, headers={"Retry-After": "60"}
+    )
+    with pytest.raises(RateLimitError):
+        atlassian_client.get_projects()
+
+
+@patch("requests.get")
+def test_get_stories_rate_limit_error(mock_get, atlassian_client):
+    """Test that a 429 on get_stories raises RateLimitError."""
+    mock_get.return_value = MockResponse({}, 429)
+    with pytest.raises(RateLimitError):
+        atlassian_client.get_stories(["10000"])
+
+
+@patch("requests.get")
+def test_get_story_pull_requests_issue_rate_limit_error(
+    mock_get, atlassian_client
+):
+    """Test that a 429 on issue lookup raises RateLimitError."""
+    mock_get.return_value = MockResponse({}, 429)
+    with pytest.raises(RateLimitError):
+        atlassian_client.get_story_pull_requests(["TEST-1"])
+
+
+@patch("requests.get")
+def test_get_story_pull_requests_dev_rate_limit_error(
+    mock_get, atlassian_client
+):
+    """Test that a 429 on dev-status raises RateLimitError."""
+    mock_issue_response = {"id": "12345"}
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if "rest/api/3/issue" in url:
+            return MockResponse(mock_issue_response)
+        return MockResponse({}, 429)
+
+    mock_get.side_effect = side_effect
+
+    with pytest.raises(RateLimitError):
+        atlassian_client.get_story_pull_requests(["TEST-1"])
