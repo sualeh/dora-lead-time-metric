@@ -423,8 +423,11 @@ def main():
     if build_database:
         try:
             create_releases_database(config)
-        except (ApiError, AuthError, RateLimitError, DatabaseOperationError) as e:
-            logger.error("API error: %s", e)
+        except (ApiError, AuthError, RateLimitError) as e:
+            logger.error("API error while building database: %s", e)
+            sys.exit(1)
+        except DatabaseOperationError as e:
+            logger.error("Database error while building database: %s", e)
             sys.exit(1)
 
     # Generate reports if flag is set
