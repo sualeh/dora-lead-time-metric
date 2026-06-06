@@ -8,6 +8,7 @@ from datetime import date, datetime
 from unittest.mock import patch, MagicMock
 
 from dora_lead_time.github_requests import GitHubRequests
+from dora_lead_time.exceptions import AuthError
 from dora_lead_time.models import PullRequestIdentifier, PullRequest
 
 
@@ -238,3 +239,57 @@ def test_get_pull_request_details_missing_token_for_org(mock_get, github_client)
     # Should return empty list since org has no token
     assert len(result) == 0
     assert mock_get.call_count == 0  # No API calls made
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+@patch("requests.get")
+def test_get_pull_request_details_auth_error(
+    mock_get, status_code, github_client
+):
+    """Test that 401/403 responses raise AuthError."""
+    mock_get.return_value = MockResponse({}, status_code)
+
+    pull_requests = [
+        PullRequestIdentifier(
+            id=1,
+            pr_owner="Org1",
+            pr_repository="test-repo",
+            pr_number="123"
+        )
+    ]
+
+    with pytest.raises(AuthError):
+        github_client.get_pull_request_details(pull_requests)
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+@patch("requests.get")
+def test_get_pull_request_commits_auth_error(
+    mock_get, status_code, github_client
+):
+    """Test that 401/403 on commits endpoint raises AuthError."""
+    mock_pr_data = {
+        "title": "Test PR",
+        "created_at": "2023-01-01T10:00:00Z",
+        "closed_at": "2023-01-02T15:30:00Z",
+    }
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if "pulls/123" in url and "/commits" not in url:
+            return MockResponse(mock_pr_data)
+        return MockResponse({}, status_code)
+
+    mock_get.side_effect = side_effect
+
+    pull_requests = [
+        PullRequestIdentifier(
+            id=1,
+            pr_owner="Org1",
+            pr_repository="test-repo",
+            pr_number="123"
+        )
+    ]
+
+    with pytest.raises(AuthError):
+        github_client.get_pull_request_details(pull_requests)

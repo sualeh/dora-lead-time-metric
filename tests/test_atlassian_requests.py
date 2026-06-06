@@ -8,6 +8,7 @@ from datetime import date, datetime
 from unittest.mock import patch, MagicMock
 
 from dora_lead_time.atlassian_requests import AtlassianRequests
+from dora_lead_time.exceptions import AuthError
 from dora_lead_time.models import Project, Release, PullRequestIdentifier
 
 
@@ -355,3 +356,94 @@ def test_get_stories_validation():
     # Test with empty string items
     with pytest.raises(ValueError):
         client.get_stories(["valid", ""])
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+@patch("requests.get")
+def test_get_projects_auth_error(mock_get, status_code, atlassian_client):
+    """Test that 401/403 on get_projects raises AuthError."""
+    mock_get.return_value = MockResponse({}, status_code)
+
+    with pytest.raises(AuthError):
+        atlassian_client.get_projects()
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+@patch("requests.get")
+def test_get_releases_auth_error(mock_get, status_code, atlassian_client):
+    """Test that 401/403 on the projects list in get_releases raises AuthError."""
+    mock_get.return_value = MockResponse({}, status_code)
+
+    with pytest.raises(AuthError):
+        atlassian_client.get_releases(
+            start_date=__import__("datetime").date(2023, 1, 1),
+            end_date=__import__("datetime").date(2023, 12, 31),
+        )
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+@patch("requests.get")
+def test_get_releases_versions_auth_error(
+    mock_get, status_code, atlassian_client
+):
+    """Test that 401/403 on per-project versions in get_releases raises AuthError."""
+    mock_projects = [
+        {"id": "10000", "key": "TEST", "projectTypeKey": "software"},
+    ]
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if url.endswith("/project"):
+            return MockResponse(mock_projects)
+        return MockResponse({}, status_code)
+
+    mock_get.side_effect = side_effect
+
+    with pytest.raises(AuthError):
+        atlassian_client.get_releases(
+            start_date=__import__("datetime").date(2023, 1, 1),
+            end_date=__import__("datetime").date(2023, 12, 31),
+        )
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+@patch("requests.get")
+def test_get_stories_auth_error(mock_get, status_code, atlassian_client):
+    """Test that 401/403 on get_stories raises AuthError."""
+    mock_get.return_value = MockResponse({}, status_code)
+
+    with pytest.raises(AuthError):
+        atlassian_client.get_stories(["10000"])
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+@patch("requests.get")
+def test_get_story_pull_requests_issue_auth_error(
+    mock_get, status_code, atlassian_client
+):
+    """Test that 401/403 on issue lookup in get_story_pull_requests raises AuthError."""
+    mock_get.return_value = MockResponse({}, status_code)
+
+    with pytest.raises(AuthError):
+        atlassian_client.get_story_pull_requests(["TEST-1"])
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+@patch("requests.get")
+def test_get_story_pull_requests_dev_auth_error(
+    mock_get, status_code, atlassian_client
+):
+    """Test that 401/403 on dev-status in get_story_pull_requests raises AuthError."""
+    mock_issue_response = {"id": "12345"}
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if "rest/api/3/issue" in url:
+            return MockResponse(mock_issue_response)
+        return MockResponse({}, status_code)
+
+    mock_get.side_effect = side_effect
+
+    with pytest.raises(AuthError):
+        atlassian_client.get_story_pull_requests(["TEST-1"])
+

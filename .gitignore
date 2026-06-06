@@ -5,6 +5,7 @@ key.txt
 outlier_reports_*/
 lead_times_*/
 poetry.lock
+*.md
 
 # Created by https://www.toptal.com/developers/gitignore/api/dotenv,python,jupyternotebooks,visualstudiocode,pycharm
 # Edit at https://www.toptal.com/developers/gitignore?templates=dotenv,python,jupyternotebooks,visualstudiocode,pycharm

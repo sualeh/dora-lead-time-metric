@@ -1,6 +1,7 @@
 """Main module of the application."""
 
 import os
+import sys
 import logging
 import json
 import argparse
@@ -10,6 +11,7 @@ from typing import NamedTuple
 from dotenv import load_dotenv
 from dora_lead_time.database_processor import DatabaseProcessor
 from dora_lead_time.atlassian_requests import AtlassianRequests
+from dora_lead_time.exceptions import AuthError
 from dora_lead_time.github_requests import GitHubRequests
 from dora_lead_time.outlier_reports import OutlierReports
 from dora_lead_time.lead_time_report import LeadTimeReport
@@ -419,7 +421,11 @@ def main():
     # If build flag is set, create the database
     build_database = args.build and config.build_database
     if build_database:
-        create_releases_database(config)
+        try:
+            create_releases_database(config)
+        except AuthError as e:
+            logger.error("Authentication error: %s", e)
+            sys.exit(1)
 
     # Generate reports if flag is set
     if args.reports:
