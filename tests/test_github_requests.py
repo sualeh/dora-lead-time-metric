@@ -8,17 +8,18 @@ from datetime import date, datetime
 from unittest.mock import patch, MagicMock
 
 from dora_lead_time.github_requests import GitHubRequests
-from dora_lead_time.exceptions import AuthError
+from dora_lead_time.exceptions import AuthError, RateLimitError
 from dora_lead_time.models import PullRequestIdentifier, PullRequest
 
 
 class MockResponse:
     """Mock response for requests."""
 
-    def __init__(self, json_data, status_code=200):
+    def __init__(self, json_data, status_code=200, headers=None):
         self.json_data = json_data
         self.status_code = status_code
         self.text = json.dumps(json_data)
+        self.headers = headers or {}
 
     def json(self):
         """Return JSON data."""
@@ -292,4 +293,54 @@ def test_get_pull_request_commits_auth_error(
     ]
 
     with pytest.raises(AuthError):
+        github_client.get_pull_request_details(pull_requests)
+
+
+@patch("requests.get")
+def test_get_pull_request_details_rate_limit_error(mock_get, github_client):
+    """Test that a 429 response on PR details raises RateLimitError."""
+    mock_get.return_value = MockResponse(
+        {}, 429, headers={"x-ratelimit-reset": "9999999999"}
+    )
+
+    pull_requests = [
+        PullRequestIdentifier(
+            id=1,
+            pr_owner="Org1",
+            pr_repository="test-repo",
+            pr_number="123"
+        )
+    ]
+
+    with pytest.raises(RateLimitError):
+        github_client.get_pull_request_details(pull_requests)
+
+
+@patch("requests.get")
+def test_get_pull_request_commits_rate_limit_error(mock_get, github_client):
+    """Test that a 429 on the commits endpoint raises RateLimitError."""
+    mock_pr_data = {
+        "title": "Test PR",
+        "created_at": "2023-01-01T10:00:00Z",
+        "closed_at": "2023-01-02T15:30:00Z",
+    }
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if "pulls/123" in url and "/commits" not in url:
+            return MockResponse(mock_pr_data)
+        return MockResponse({}, 429, headers={"Retry-After": "30"})
+
+    mock_get.side_effect = side_effect
+
+    pull_requests = [
+        PullRequestIdentifier(
+            id=1,
+            pr_owner="Org1",
+            pr_repository="test-repo",
+            pr_number="123"
+        )
+    ]
+
+    with pytest.raises(RateLimitError):
         github_client.get_pull_request_details(pull_requests)
