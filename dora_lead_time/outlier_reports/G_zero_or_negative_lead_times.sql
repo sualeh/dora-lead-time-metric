@@ -1,3 +1,5 @@
+-- Lookback window: 60 days — a two-month rolling window captures recently
+-- closed releases and their associated stories and pull requests.
 SELECT
   stories.story_key,
   stories.story_title,

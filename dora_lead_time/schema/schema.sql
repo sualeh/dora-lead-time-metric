@@ -90,6 +90,8 @@ SELECT
 	pull_requests.earliest_commit_date,
 	julianday(releases.release_date) -
 	  julianday(pull_requests.earliest_commit_date) + 1
+	  -- +1 makes the range inclusive: the day of the earliest commit counts as day 1,
+	  -- so a commit and release on the same day yields a lead time of 1, not 0.
 	  AS lead_time
 FROM
 	releases
