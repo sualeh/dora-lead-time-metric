@@ -9,7 +9,7 @@ from datetime import date, datetime
 import pathlib
 from typing import NamedTuple
 from dotenv import load_dotenv
-from dora_lead_time.database_processor import DatabaseProcessor
+from dora_lead_time.database_processor import DatabaseProcessor, DatabaseOperationError
 from dora_lead_time.atlassian_requests import AtlassianRequests
 from dora_lead_time.api_client import ApiError, AuthError, RateLimitError
 from dora_lead_time.github_requests import GitHubRequests
@@ -423,7 +423,7 @@ def main():
     if build_database:
         try:
             create_releases_database(config)
-        except (ApiError, AuthError, RateLimitError) as e:
+        except (ApiError, AuthError, RateLimitError, DatabaseOperationError) as e:
             logger.error("API error: %s", e)
             sys.exit(1)
 
@@ -433,7 +433,11 @@ def main():
 
     # Generate lead time charts if flag is set
     if args.charts:
-        save_lead_time_charts(config)
+        try:
+            save_lead_time_charts(config)
+        except DatabaseOperationError as e:
+            logger.error("Database error generating charts: %s", e)
+            sys.exit(1)
 
 
 if __name__ == "__main__":
