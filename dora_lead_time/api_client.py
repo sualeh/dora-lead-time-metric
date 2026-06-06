@@ -169,7 +169,7 @@ def api_get(
         auth: Optional ``(username, password)`` tuple for HTTP Basic Auth.
         params: Optional query-string parameters to append to the URL.
         timeout: Request timeout in seconds. Defaults to 30.
-        raise_on_error: If ``True``, raise ``ApiError`` for any non-2xx
+        raise_on_error: If ``True``, raise ``ApiError`` for any 4xx/5xx
             response not already handled by ``raise_if_auth_error`` or
             ``raise_if_rate_limit_error``. If ``False``, return the response
             regardless of status code.
