@@ -1,3 +1,5 @@
+-- Lookback window: 60 days — a two-month rolling window captures recently
+-- closed releases and their associated stories and pull requests.
 SELECT
   stories.story_key,
   stories.story_title,
@@ -18,6 +20,8 @@ FROM
     ON releases.project_id = projects.id
 WHERE
   pull_requests.earliest_commit_date IS NOT NULL
+  -- >5: flag PRs whose commits predate PR creation by more than 5 days,
+  -- indicating a long-lived branch that increases integration risk.
   AND julianday(pull_requests.pr_open) - julianday(pull_requests.earliest_commit_date) > 5
   AND julianday('now') - julianday(releases.release_date) <= 60
 ORDER BY
