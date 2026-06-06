@@ -154,7 +154,7 @@ def api_get(
     Always raises ``AuthError`` on 401/403 and ``RateLimitError`` on 429.
 
     When *raise_on_error* is ``True`` (the default), also raises ``ApiError``
-    for any remaining non-2xx response — use this for structural or
+    for any remaining 4xx/5xx response — use this for structural or
     list-based requests where a failure means the entire operation cannot
     proceed.
 
