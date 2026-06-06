@@ -6,8 +6,10 @@ from unittest.mock import MagicMock
 
 from dora_lead_time.exceptions import (
     ApiSource,
+    ApiError,
     AuthError,
     RateLimitError,
+    raise_if_api_error,
     raise_if_auth_error,
     raise_if_rate_limit_error,
 )
@@ -123,3 +125,36 @@ def test_raise_if_rate_limit_error_prefers_retry_after_over_reset():
     )
     with pytest.raises(RateLimitError, match="30 seconds"):
         raise_if_rate_limit_error(response, ApiSource.ATLASSIAN)
+
+
+# ---------------------------------------------------------------------------
+# raise_if_api_error
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("status_code", [400, 404, 500, 503])
+def test_raise_if_api_error_raises(status_code):
+    """4xx and 5xx responses raise ApiError."""
+    response = _mock_response(status_code)
+    with pytest.raises(ApiError):
+        raise_if_api_error(response, ApiSource.ATLASSIAN)
+
+
+def test_raise_if_api_error_message_contains_source():
+    """ApiError message identifies the API source."""
+    response = _mock_response(500)
+    with pytest.raises(ApiError, match="Atlassian"):
+        raise_if_api_error(response, ApiSource.ATLASSIAN)
+
+
+def test_raise_if_api_error_message_contains_status():
+    """ApiError message includes the HTTP status code."""
+    response = _mock_response(500)
+    with pytest.raises(ApiError, match="500"):
+        raise_if_api_error(response, ApiSource.ATLASSIAN)
+
+
+@pytest.mark.parametrize("status_code", [200, 201, 204])
+def test_raise_if_api_error_no_raise(status_code):
+    """2xx responses do not raise ApiError."""
+    response = _mock_response(status_code)
+    raise_if_api_error(response, ApiSource.GITHUB)  # should not raise

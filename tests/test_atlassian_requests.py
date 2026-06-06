@@ -8,7 +8,7 @@ from datetime import date, datetime
 from unittest.mock import patch, MagicMock
 
 from dora_lead_time.atlassian_requests import AtlassianRequests
-from dora_lead_time.exceptions import AuthError, RateLimitError
+from dora_lead_time.exceptions import ApiError, AuthError, RateLimitError
 from dora_lead_time.models import Project, Release, PullRequestIdentifier
 
 
@@ -494,3 +494,58 @@ def test_get_story_pull_requests_dev_rate_limit_error(
 
     with pytest.raises(RateLimitError):
         atlassian_client.get_story_pull_requests(["TEST-1"])
+
+
+@pytest.mark.parametrize("status_code", [404, 500, 503])
+@patch("requests.get")
+def test_get_projects_api_error(mock_get, status_code, atlassian_client):
+    """Test that 4xx/5xx on get_projects raises ApiError."""
+    mock_get.return_value = MockResponse({}, status_code)
+    with pytest.raises(ApiError):
+        atlassian_client.get_projects()
+
+
+@pytest.mark.parametrize("status_code", [404, 500, 503])
+@patch("requests.get")
+def test_get_releases_structural_api_error(
+    mock_get, status_code, atlassian_client
+):
+    """Test that 4xx/5xx on the projects list in get_releases raises ApiError."""
+    mock_get.return_value = MockResponse({}, status_code)
+    with pytest.raises(ApiError):
+        atlassian_client.get_releases(
+            start_date=__import__("datetime").date(2023, 1, 1),
+            end_date=__import__("datetime").date(2023, 12, 31),
+        )
+
+
+@pytest.mark.parametrize("status_code", [404, 500, 503])
+@patch("requests.get")
+def test_get_stories_api_error(mock_get, status_code, atlassian_client):
+    """Test that 4xx/5xx on get_stories raises ApiError."""
+    mock_get.return_value = MockResponse({}, status_code)
+    with pytest.raises(ApiError):
+        atlassian_client.get_stories(["10000"])
+
+
+@patch("requests.get")
+def test_get_releases_versions_non_200_skips(mock_get, atlassian_client):
+    """Test that per-project versions errors are skipped, not raised."""
+    mock_projects = [
+        {"id": "10000", "key": "TEST", "projectTypeKey": "software"},
+    ]
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if url.endswith("/project"):
+            return MockResponse(mock_projects)
+        return MockResponse({}, 404)
+
+    mock_get.side_effect = side_effect
+
+    # Should return empty list, not raise
+    releases = atlassian_client.get_releases(
+        start_date=__import__("datetime").date(2023, 1, 1),
+        end_date=__import__("datetime").date(2023, 12, 31),
+    )
+    assert releases == []

@@ -9,7 +9,7 @@ from typing import Dict, List
 import requests
 from dotenv import load_dotenv
 
-from dora_lead_time.exceptions import ApiSource, raise_if_auth_error, raise_if_rate_limit_error
+from dora_lead_time.exceptions import ApiSource, ApiError, raise_if_auth_error, raise_if_rate_limit_error, raise_if_api_error
 from dora_lead_time.models import (
     Project,
     Release,
@@ -84,7 +84,7 @@ class AtlassianRequests:
         )
         raise_if_auth_error(response, ApiSource.ATLASSIAN)
         raise_if_rate_limit_error(response, ApiSource.ATLASSIAN)
-        response.raise_for_status()
+        raise_if_api_error(response, ApiSource.ATLASSIAN)
 
         all_projects = response.json()
         projects = [
@@ -131,7 +131,7 @@ class AtlassianRequests:
         )
         raise_if_auth_error(response, ApiSource.ATLASSIAN)
         raise_if_rate_limit_error(response, ApiSource.ATLASSIAN)
-        response.raise_for_status()
+        raise_if_api_error(response, ApiSource.ATLASSIAN)
 
         all_projects = response.json()
         project_keys = [
@@ -149,6 +149,11 @@ class AtlassianRequests:
             raise_if_auth_error(response, ApiSource.ATLASSIAN)
             raise_if_rate_limit_error(response, ApiSource.ATLASSIAN)
             if response.status_code != 200:
+                logger.warning(
+                    "Could not fetch versions for project %s "
+                    "(HTTP %s); skipping",
+                    project_key, response.status_code
+                )
                 continue
 
             versions = response.json()
@@ -242,7 +247,7 @@ class AtlassianRequests:
             )
             raise_if_auth_error(response, ApiSource.ATLASSIAN)
             raise_if_rate_limit_error(response, ApiSource.ATLASSIAN)
-            response.raise_for_status()
+            raise_if_api_error(response, ApiSource.ATLASSIAN)
 
             data = response.json()
             is_last = data.get("isLast", False)
