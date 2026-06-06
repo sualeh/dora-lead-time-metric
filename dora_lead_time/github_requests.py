@@ -6,7 +6,7 @@ from datetime import datetime
 
 import requests
 from dotenv import load_dotenv
-from dora_lead_time.exceptions import raise_if_auth_error, raise_if_rate_limit_error
+from dora_lead_time.exceptions import ApiSource, raise_if_auth_error, raise_if_rate_limit_error
 from dora_lead_time.models import PullRequestIdentifier, PullRequest
 
 logging.basicConfig(
@@ -95,10 +95,10 @@ class GitHubRequests:
                 api_url, headers=headers, timeout=self.request_timeout
             )
             raise_if_auth_error(
-                response, f"GitHub token for {owner}"
+                response, ApiSource.GITHUB
             )
             raise_if_rate_limit_error(
-                response, f"GitHub API for {owner}"
+                response, ApiSource.GITHUB
             )
             if response.status_code != 200:
                 logger.error(
@@ -123,10 +123,10 @@ class GitHubRequests:
                 commits_url, headers=headers, timeout=self.request_timeout
             )
             raise_if_auth_error(
-                commits_response, f"GitHub token for {owner}"
+                commits_response, ApiSource.GITHUB
             )
             raise_if_rate_limit_error(
-                commits_response, f"GitHub API for {owner}"
+                commits_response, ApiSource.GITHUB
             )
             if commits_response.status_code != 200:
                 commits = []

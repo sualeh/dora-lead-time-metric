@@ -9,7 +9,7 @@ from typing import Dict, List
 import requests
 from dotenv import load_dotenv
 
-from dora_lead_time.exceptions import raise_if_auth_error, raise_if_rate_limit_error
+from dora_lead_time.exceptions import ApiSource, raise_if_auth_error, raise_if_rate_limit_error
 from dora_lead_time.models import (
     Project,
     Release,
@@ -82,8 +82,8 @@ class AtlassianRequests:
             auth=auth,
             timeout=self.request_timeout
         )
-        raise_if_auth_error(response, "Atlassian token")
-        raise_if_rate_limit_error(response, "Atlassian API")
+        raise_if_auth_error(response, ApiSource.ATLASSIAN)
+        raise_if_rate_limit_error(response, ApiSource.ATLASSIAN)
         response.raise_for_status()
 
         all_projects = response.json()
@@ -129,8 +129,8 @@ class AtlassianRequests:
             auth=auth,
             timeout=self.request_timeout
         )
-        raise_if_auth_error(response, "Atlassian token")
-        raise_if_rate_limit_error(response, "Atlassian API")
+        raise_if_auth_error(response, ApiSource.ATLASSIAN)
+        raise_if_rate_limit_error(response, ApiSource.ATLASSIAN)
         response.raise_for_status()
 
         all_projects = response.json()
@@ -146,8 +146,8 @@ class AtlassianRequests:
             response = requests.get(
                 url, headers=headers, auth=auth, timeout=self.request_timeout
             )
-            raise_if_auth_error(response, "Atlassian token")
-            raise_if_rate_limit_error(response, "Atlassian API")
+            raise_if_auth_error(response, ApiSource.ATLASSIAN)
+            raise_if_rate_limit_error(response, ApiSource.ATLASSIAN)
             if response.status_code != 200:
                 continue
 
@@ -240,8 +240,8 @@ class AtlassianRequests:
                 params=params,
                 timeout=self.request_timeout,
             )
-            raise_if_auth_error(response, "Atlassian token")
-            raise_if_rate_limit_error(response, "Atlassian API")
+            raise_if_auth_error(response, ApiSource.ATLASSIAN)
+            raise_if_rate_limit_error(response, ApiSource.ATLASSIAN)
             response.raise_for_status()
 
             data = response.json()
@@ -353,8 +353,8 @@ class AtlassianRequests:
                 auth=auth,
                 timeout=self.request_timeout
             )
-            raise_if_auth_error(issue_response, "Atlassian token")
-            raise_if_rate_limit_error(issue_response, "Atlassian API")
+            raise_if_auth_error(issue_response, ApiSource.ATLASSIAN)
+            raise_if_rate_limit_error(issue_response, ApiSource.ATLASSIAN)
 
             if issue_response.status_code != 200:
                 logger.error(
@@ -382,8 +382,8 @@ class AtlassianRequests:
                 auth=auth,
                 timeout=self.request_timeout
             )
-            raise_if_auth_error(dev_response, "Atlassian token")
-            raise_if_rate_limit_error(dev_response, "Atlassian API")
+            raise_if_auth_error(dev_response, ApiSource.ATLASSIAN)
+            raise_if_rate_limit_error(dev_response, ApiSource.ATLASSIAN)
 
             if dev_response.status_code != 200:
                 logger.error(
