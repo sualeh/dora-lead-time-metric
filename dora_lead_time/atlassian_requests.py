@@ -5,11 +5,9 @@ import os
 import textwrap
 from datetime import date, datetime
 from typing import Dict, List
-
-import requests
 from dotenv import load_dotenv
 
-from dora_lead_time.exceptions import ApiSource, ApiError, raise_if_auth_error, raise_if_rate_limit_error, raise_if_api_error
+from dora_lead_time.api_client import ApiSource, api_get
 from dora_lead_time.models import (
     Project,
     Release,
@@ -76,15 +74,10 @@ class AtlassianRequests:
         }
         auth = (self.email, self.token)
         projects_url = f"https://{self.jira_instance}/rest/api/3/project"
-        response = requests.get(
-            projects_url,
-            headers=headers,
-            auth=auth,
-            timeout=self.request_timeout
+        response = api_get(
+            projects_url, ApiSource.ATLASSIAN,
+            headers=headers, auth=auth, timeout=self.request_timeout,
         )
-        raise_if_auth_error(response, ApiSource.ATLASSIAN)
-        raise_if_rate_limit_error(response, ApiSource.ATLASSIAN)
-        raise_if_api_error(response, ApiSource.ATLASSIAN)
 
         all_projects = response.json()
         projects = [
@@ -123,15 +116,10 @@ class AtlassianRequests:
         }
         auth = (self.email, self.token)
         projects_url = f"https://{self.jira_instance}/rest/api/3/project"
-        response = requests.get(
-            projects_url,
-            headers=headers,
-            auth=auth,
-            timeout=self.request_timeout
+        response = api_get(
+            projects_url, ApiSource.ATLASSIAN,
+            headers=headers, auth=auth, timeout=self.request_timeout,
         )
-        raise_if_auth_error(response, ApiSource.ATLASSIAN)
-        raise_if_rate_limit_error(response, ApiSource.ATLASSIAN)
-        raise_if_api_error(response, ApiSource.ATLASSIAN)
 
         all_projects = response.json()
         project_keys = [
@@ -143,11 +131,10 @@ class AtlassianRequests:
         releases = []
         for project_key in project_keys:
             url = f"{projects_url}/{project_key}/versions"
-            response = requests.get(
-                url, headers=headers, auth=auth, timeout=self.request_timeout
+            response = api_get(
+                url, ApiSource.ATLASSIAN, raise_on_error=False,
+                headers=headers, auth=auth, timeout=self.request_timeout,
             )
-            raise_if_auth_error(response, ApiSource.ATLASSIAN)
-            raise_if_rate_limit_error(response, ApiSource.ATLASSIAN)
             if response.status_code != 200:
                 logger.warning(
                     "Could not fetch versions for project %s "
@@ -238,16 +225,11 @@ class AtlassianRequests:
             }
 
             logger.info("Fetching stories batch starting at %s", start_at)
-            response = requests.get(
-                url,
-                headers=headers,
-                auth=auth,
-                params=params,
+            response = api_get(
+                url, ApiSource.ATLASSIAN,
+                headers=headers, auth=auth, params=params,
                 timeout=self.request_timeout,
             )
-            raise_if_auth_error(response, ApiSource.ATLASSIAN)
-            raise_if_rate_limit_error(response, ApiSource.ATLASSIAN)
-            raise_if_api_error(response, ApiSource.ATLASSIAN)
 
             data = response.json()
             is_last = data.get("isLast", False)
@@ -352,14 +334,10 @@ class AtlassianRequests:
             issue_url = (
                 f"https://{self.jira_instance}/rest/api/3/issue/{story}?fields=id"
             )
-            issue_response = requests.get(
-                issue_url,
-                headers=headers,
-                auth=auth,
-                timeout=self.request_timeout
+            issue_response = api_get(
+                issue_url, ApiSource.ATLASSIAN, raise_on_error=False,
+                headers=headers, auth=auth, timeout=self.request_timeout,
             )
-            raise_if_auth_error(issue_response, ApiSource.ATLASSIAN)
-            raise_if_rate_limit_error(issue_response, ApiSource.ATLASSIAN)
 
             if issue_response.status_code != 200:
                 logger.error(
@@ -381,14 +359,10 @@ class AtlassianRequests:
                 f"&applicationType=GitHub"
                 f"&dataType=pullrequest"
             )
-            dev_response = requests.get(
-                dev_url,
-                headers=headers,
-                auth=auth,
-                timeout=self.request_timeout
+            dev_response = api_get(
+                dev_url, ApiSource.ATLASSIAN, raise_on_error=False,
+                headers=headers, auth=auth, timeout=self.request_timeout,
             )
-            raise_if_auth_error(dev_response, ApiSource.ATLASSIAN)
-            raise_if_rate_limit_error(dev_response, ApiSource.ATLASSIAN)
 
             if dev_response.status_code != 200:
                 logger.error(

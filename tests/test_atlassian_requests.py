@@ -8,7 +8,7 @@ from datetime import date, datetime
 from unittest.mock import patch, MagicMock
 
 from dora_lead_time.atlassian_requests import AtlassianRequests
-from dora_lead_time.exceptions import ApiError, AuthError, RateLimitError
+from dora_lead_time.api_client import ApiError, AuthError, RateLimitError
 from dora_lead_time.models import Project, Release, PullRequestIdentifier
 
 
