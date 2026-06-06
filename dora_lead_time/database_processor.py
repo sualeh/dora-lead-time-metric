@@ -126,6 +126,8 @@ class DatabaseProcessor:
                 """,
                 e
             )
+            if conn:
+                conn.rollback()
         finally:
             if conn:
                 conn.close()
@@ -180,6 +182,8 @@ class DatabaseProcessor:
                 """,
                 e
             )
+            if conn:
+                conn.rollback()
         finally:
             if conn:
                 conn.close()
@@ -226,6 +230,8 @@ class DatabaseProcessor:
                 """,
                 e
             )
+            if conn:
+                conn.rollback()
         finally:
             if conn:
                 conn.close()
@@ -272,6 +278,8 @@ class DatabaseProcessor:
 
         except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
             logger.error("Database error while updating project types: %s", e)
+            if conn:
+                conn.rollback()
         finally:
             if conn:
                 conn.close()
@@ -373,6 +381,8 @@ class DatabaseProcessor:
                 """,
                 e
             )
+            if conn:
+                conn.rollback()
         finally:
             if conn:
                 conn.close()
@@ -421,6 +431,8 @@ class DatabaseProcessor:
                 e
             )
             release_ids = []
+            if conn:
+                conn.rollback()
         finally:
             if conn:
                 conn.close()
@@ -523,6 +535,8 @@ class DatabaseProcessor:
                 """,
                 e
             )
+            if conn:
+                conn.rollback()
         finally:
             if conn:
                 conn.close()
@@ -574,6 +588,8 @@ class DatabaseProcessor:
                 e
             )
             story_keys = []
+            if conn:
+                conn.rollback()
         finally:
             if conn:
                 conn.close()
@@ -725,6 +741,8 @@ class DatabaseProcessor:
                 """,
                 e
             )
+            if conn:
+                conn.rollback()
         finally:
             if conn:
                 conn.close()
@@ -785,6 +803,8 @@ class DatabaseProcessor:
                 e
             )
             pull_requests = []
+            if conn:
+                conn.rollback()
         finally:
             if conn:
                 # Close the connection
@@ -855,6 +875,8 @@ class DatabaseProcessor:
                 """,
                 e
             )
+            if conn:
+                conn.rollback()
         finally:
             if conn:
                 conn.close()
@@ -931,6 +953,8 @@ class DatabaseProcessor:
 
         except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
             logger.error("Failed to retrieve summary data: %s", e)
+            if conn:
+                conn.rollback()
         finally:
             if conn:
                 conn.close()
