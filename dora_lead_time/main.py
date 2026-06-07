@@ -9,8 +9,14 @@ from datetime import date, datetime
 import pathlib
 from typing import NamedTuple
 from dotenv import load_dotenv
-from dora_lead_time.database_processor import DatabaseProcessor, DatabaseOperationError
-from dora_lead_time.atlassian_requests import AtlassianRequests
+from dora_lead_time.database_processor import (
+    DatabaseOperationError,
+    DatabaseProcessor,
+)
+from dora_lead_time.atlassian_requests import (
+    AtlassianRequests,
+    ConfigurationError,
+)
 from dora_lead_time.api_client import ApiError, AuthError, RateLimitError
 from dora_lead_time.github_requests import GitHubRequests
 from dora_lead_time.outlier_reports import OutlierReports
@@ -118,6 +124,7 @@ def create_releases_database(config: LeadTimeConfiguration):
     logger.info("-- 2. Getting projects from Atlassian Jira")
     projects = atlassian_client.get_projects()
     db_processor.save_projects(projects)
+    db_processor.print_summary()
 
     # Step 3: Get and save releases
     logger.info(
@@ -127,9 +134,11 @@ def create_releases_database(config: LeadTimeConfiguration):
     )
     releases = atlassian_client.get_releases(
         config.start_date,
-        config.end_date
+        config.end_date,
+        projects=projects,
     )
     db_processor.save_releases(releases)
+    db_processor.print_summary()
 
     # Step 4: Find releases without stories, get stories and save them
     logger.info("-- 4. Getting stories for releases from Atlassian Jira")
@@ -139,6 +148,7 @@ def create_releases_database(config: LeadTimeConfiguration):
         logger.info("Getting stories for %d releases", len(release_ids))
         stories = atlassian_client.get_stories(release_ids)
         db_processor.save_stories(stories)
+    db_processor.print_summary()
 
     # Step 5: Find stories without pull requests, get PRs and save them
     logger.info("-- 5. Getting pull requests for stories from Atlassian Jira")
@@ -158,6 +168,7 @@ def create_releases_database(config: LeadTimeConfiguration):
             db_processor.save_story_pull_requests(story_pull_requests)
         else:
             break
+    db_processor.print_summary()
 
     # Step 6: Find pull requests without details, get details and save them
     logger.info("-- 6. Getting details for pull requests from GitHub")
@@ -175,6 +186,7 @@ def create_releases_database(config: LeadTimeConfiguration):
             db_processor.save_pull_request_details(pr_details)
         else:
             break
+    db_processor.print_summary()
 
     logger.info("-- 7. Release database creation completed successfully")
     db_processor.print_summary()
@@ -423,6 +435,9 @@ def main():
     if build_database:
         try:
             create_releases_database(config)
+        except ConfigurationError as e:
+            logger.error("Configuration error while building database: %s", e)
+            sys.exit(1)
         except (ApiError, AuthError, RateLimitError) as e:
             logger.error("API error while building database: %s", e)
             sys.exit(1)

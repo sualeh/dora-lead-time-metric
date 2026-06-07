@@ -4,10 +4,13 @@ import logging
 import os
 import textwrap
 from datetime import date, datetime
-from typing import Dict, List
+from typing import Dict, List, cast
 from dotenv import load_dotenv
 
-from dora_lead_time.api_client import ApiSource, api_get
+from dora_lead_time.api_client import (
+    ApiSource,
+    api_get,
+)
 from dora_lead_time.models import (
     Project,
     Release,
@@ -20,6 +23,10 @@ logging.basicConfig(
     format="%(asctime)s `%(funcName)s` %(levelname)s:\n  %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+
+class ConfigurationError(Exception):
+    """Raised when required application configuration is missing."""
 
 
 class AtlassianRequests:
@@ -41,21 +48,53 @@ class AtlassianRequests:
                 Defaults to 30.
 
         Raises:
-            ValueError: If required credentials cannot be found
+            ConfigurationError: If required credentials cannot be found
+            AuthError: If Atlassian authentication fails
         """
         load_dotenv()
 
-        self.jira_instance = jira_instance or os.getenv("JIRA_INSTANCE")
-        self.email = email or os.getenv("EMAIL")
-        self.token = os.getenv("ATLASSIAN_TOKEN")
+        jira_instance_value = jira_instance or os.getenv("JIRA_INSTANCE")
+        email_value = email or os.getenv("EMAIL")
+        token_value = os.getenv("ATLASSIAN_TOKEN")
         self.request_timeout = request_timeout
 
-        if not all([self.jira_instance, self.email, self.token]):
-            raise ValueError(
+        if not all([jira_instance_value, email_value, token_value]):
+            raise ConfigurationError(
                 "Missing required credentials. "
                 "Ensure JIRA_INSTANCE, EMAIL, and ATLASSIAN_TOKEN "
                 "are provided or set as environment variables."
             )
+
+        self.jira_instance = cast(str, jira_instance_value)
+        self.email = cast(str, email_value)
+        self.token = cast(str, token_value)
+
+        self._verify_authentication()
+
+    def _verify_authentication(self) -> dict:
+        """Verify Jira credentials and log the authenticated identity."""
+
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
+        auth = (self.email, self.token)
+        myself_url = f"https://{self.jira_instance}/rest/api/3/myself"
+        response = api_get(
+            myself_url,
+            ApiSource.ATLASSIAN,
+            headers,
+            auth=auth,
+            timeout=self.request_timeout,
+        )
+
+        user_info = response.json()
+        logger.info(
+            "Authenticated Jira user: (name=%s, url=%s)",
+            user_info.get("displayName"),
+            user_info.get("self"),
+        )
+        return user_info
 
     def get_projects(self) -> List[Project]:
         """Get all projects from Jira.
@@ -65,6 +104,10 @@ class AtlassianRequests:
                 (project_internal_id, project_key, project_title, project_type)
 
         Raises:
+            ConfigurationError: If Jira returns no visible software projects.
+            AuthError: If authentication fails (HTTP 401/403).
+            RateLimitError: If rate limit is exceeded (HTTP 429).
+            ApiError: If Jira returns an unrecoverable 4xx/5xx response.
             requests.RequestException: If there's an error connecting to Jira
         """
 
@@ -78,8 +121,8 @@ class AtlassianRequests:
             projects_url, ApiSource.ATLASSIAN, headers,
             auth=auth, timeout=self.request_timeout,
         )
-
         all_projects = response.json()
+
         projects = [
             Project(
                 id=None,
@@ -91,22 +134,36 @@ class AtlassianRequests:
             for project in all_projects
             if project.get("projectTypeKey") == "software"
         ]
+        if not projects:
+            raise ConfigurationError(
+                "Atlassian returned no visible software projects. "
+                "Verify project access and configuration."
+            )
         projects = sorted(projects, key=lambda x: x.project_title)
         return projects
 
     def get_releases(
-        self, start_date: date, end_date: date
+        self,
+        start_date: date,
+        end_date: date,
+        projects: list[Project] | None = None,
     ) -> List[Release]:
         """Get all released versions between two dates for specified projects.
 
         Args:
             start_date (date): Start date for release search (inclusive)
             end_date (date): End date for release search (inclusive)
+            projects (list[Project] | None): Pre-fetched Jira projects.
+                Required. Projects are not fetched in this method.
 
         Returns:
             List[Release]: List of Release named tuples
 
         Raises:
+            ConfigurationError: If projects is missing or has no
+                software projects.
+            AuthError: If authentication fails (HTTP 401/403).
+            RateLimitError: If rate limit is exceeded (HTTP 429).
             requests.RequestException: If there's an error connecting to Jira
         """
 
@@ -115,22 +172,27 @@ class AtlassianRequests:
             "Content-Type": "application/json",
         }
         auth = (self.email, self.token)
-        projects_url = f"https://{self.jira_instance}/rest/api/3/project"
-        response = api_get(
-            projects_url, ApiSource.ATLASSIAN, headers,
-            auth=auth, timeout=self.request_timeout,
-        )
+        jira_base_url = f"https://{self.jira_instance}/rest/api/3"
 
-        all_projects = response.json()
+        if projects is None:
+            raise ConfigurationError(
+                "Projects are required to retrieve releases"
+            )
+
         project_keys = [
-            (project["key"])
-            for project in all_projects
-            if project.get("projectTypeKey") == "software"
+            project.project_key
+            for project in projects
+            if project.project_type == "software"
         ]
+
+        if not project_keys:
+            raise ConfigurationError(
+                "No software projects available to retrieve releases"
+            )
 
         releases = []
         for project_key in project_keys:
-            url = f"{projects_url}/{project_key}/versions"
+            url = f"{jira_base_url}/project/{project_key}/versions"
             response = api_get(
                 url, ApiSource.ATLASSIAN, headers,
                 auth=auth, timeout=self.request_timeout,
@@ -332,7 +394,8 @@ class AtlassianRequests:
         for story in story_numbers:
             # First get the issue id
             issue_url = (
-                f"https://{self.jira_instance}/rest/api/3/issue/{story}?fields=id"
+                f"https://{self.jira_instance}/rest/api/3/issue/"
+                f"{story}?fields=id"
             )
             issue_response = api_get(
                 issue_url, ApiSource.ATLASSIAN, headers,
@@ -355,7 +418,8 @@ class AtlassianRequests:
 
             # Then get development information using the issue id
             dev_url = (
-                f"https://{self.jira_instance}/rest/dev-status/latest/issue/detail"
+                "https://"
+                f"{self.jira_instance}/rest/dev-status/latest/issue/detail"
                 f"?issueId={issue_id}"
                 f"&applicationType=GitHub"
                 f"&dataType=pullrequest"

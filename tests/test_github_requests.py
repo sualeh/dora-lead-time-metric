@@ -36,10 +36,34 @@ def github_client():
             "GITHUB_TOKEN_ORG2": "test-token-org2",
         },
     ):
-        return GitHubRequests({
-            "Org1": "GITHUB_TOKEN_ORG1",
-            "Org2": "GITHUB_TOKEN_ORG2"
-        })
+        with patch("requests.get") as mock_get:
+            def side_effect(*args, **kwargs):
+                token = kwargs.get("headers", {}).get("Authorization")
+                if token == "token test-token-org1":
+                    return MockResponse(
+                        {
+                            "login": "org1-user",
+                            "name": "Org1 User",
+                            "html_url": "https://github.com/org1-user",
+                        }
+                    )
+                if token == "token test-token-org2":
+                    return MockResponse(
+                        {
+                            "login": "org2-user",
+                            "name": "Org2 User",
+                            "html_url": "https://github.com/org2-user",
+                        }
+                    )
+                return MockResponse({}, status_code=401)
+
+            mock_get.side_effect = side_effect
+            return GitHubRequests(
+                {
+                    "Org1": "GITHUB_TOKEN_ORG1",
+                    "Org2": "GITHUB_TOKEN_ORG2",
+                }
+            )
 
 
 def test_init_with_token_map():
@@ -50,7 +74,9 @@ def test_init_with_token_map():
             "CUSTOM_TOKEN": "custom-token",
         },
     ):
-        client = GitHubRequests({"CustomOrg": "CUSTOM_TOKEN"})
+        with patch("requests.get") as mock_get:
+            mock_get.return_value = MockResponse({"login": "custom-user", "name": "Custom User", "html_url": "https://github.com/custom-user"})
+            client = GitHubRequests({"CustomOrg": "CUSTOM_TOKEN"})
         assert "CustomOrg" in client.github_token_map
         assert client.github_token_map["CustomOrg"] == "custom-token"
 
@@ -58,7 +84,9 @@ def test_init_with_token_map():
 def test_init_with_missing_token():
     """Test initialization with missing token in environment."""
     with patch.dict(os.environ, {}, clear=True):
-        client = GitHubRequests({"MissingOrg": "MISSING_TOKEN"})
+        with patch("requests.get") as mock_get:
+            mock_get.return_value = MockResponse({"login": "missing-user", "name": "Missing User", "html_url": "https://github.com/missing-user"})
+            client = GitHubRequests({"MissingOrg": "MISSING_TOKEN"})
         assert "MissingOrg" not in client.github_token_map
 
 
