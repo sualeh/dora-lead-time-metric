@@ -964,6 +964,12 @@ class DatabaseProcessor:
         """
         conn = None
         try:
+            database_name = (
+                self.sqlite_path
+                if self.sqlite_path == ":memory:"
+                else pathlib.Path(self.sqlite_path).name
+            )
+
             conn = self._get_connection()
             cursor = conn.cursor()
 
@@ -984,10 +990,16 @@ class DatabaseProcessor:
             rows = cursor.fetchall()
 
             if not rows:
-                logger.info("No summary data available in the database")
+                logger.info(
+                    "No summary data available in database: %s",
+                    database_name,
+                )
                 return
 
-            summary_lines = ["Data summary:"]
+            summary_lines = [
+                f"Database: {database_name}",
+                "Data summary:",
+            ]
             for row in rows:
                 entity_type, count, earliest_date, latest_date = row
                 summary_lines.append(
