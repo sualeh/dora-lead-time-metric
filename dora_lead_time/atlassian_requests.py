@@ -154,7 +154,7 @@ class AtlassianRequests:
             "Content-Type": "application/json",
         }
         auth = (self.email, self.token)
-        projects_url = f"https://{self.jira_instance}/rest/api/3/project"
+        jira_base_url = f"https://{self.jira_instance}/rest/api/3"
 
         if projects is None:
             raise DatabaseOperationError(
@@ -174,7 +174,7 @@ class AtlassianRequests:
 
         releases = []
         for project_key in project_keys:
-            url = f"{projects_url}/{project_key}/versions"
+            url = f"{jira_base_url}/project/{project_key}/versions"
             response = api_get(
                 url, ApiSource.ATLASSIAN, headers,
                 auth=auth, timeout=self.request_timeout,
