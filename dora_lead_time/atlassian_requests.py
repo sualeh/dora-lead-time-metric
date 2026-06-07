@@ -159,9 +159,10 @@ class AtlassianRequests:
             List[Release]: List of Release named tuples
 
         Raises:
-            ConfigurationError: If there are no projects to process
+            ConfigurationError: If projects is missing or has no software projects.
+            AuthError: If authentication fails (HTTP 401/403).
+            RateLimitError: If rate limit is exceeded (HTTP 429).
             requests.RequestException: If there's an error connecting to Jira
-        """
 
         headers = {
             "Accept": "application/json",
