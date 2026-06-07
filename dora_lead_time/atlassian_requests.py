@@ -269,7 +269,7 @@ class AtlassianRequests:
         """
 
         # Initialize variables for pagination
-        start_at = 0
+        issues_processed = 0
         max_results = 25
         all_stories = []
         is_last = False
@@ -287,7 +287,10 @@ class AtlassianRequests:
                 ),
             }
 
-            logger.info("Fetching stories batch starting at %s", start_at)
+            logger.info(
+                "Fetching next issues batch after %s issues processed",
+                issues_processed,
+            )
             response = api_get(
                 url, ApiSource.ATLASSIAN, headers,
                 auth=auth, params=params, timeout=self.request_timeout,
@@ -325,16 +328,17 @@ class AtlassianRequests:
                         all_stories.append(story_details)
 
             # Move to next batch
-            start_at += len(data["issues"])
+            issues_processed += len(data["issues"])
             logger.info(
                 textwrap.dedent("""
-                    Retrieved %d stories, for batch starting at %d
-                    (Story counts may not match if they are part of
-                    more than one release)
-                    Total stories retrieved: %d
+                    Retrieved %d issues in current batch
+                    Issues processed so far: %d
+                    (Story row counts may not match unique issues if they are
+                    part of more than one release)
+                    Total story rows retrieved: %d
                 """).strip(),
                 len(data["issues"]),
-                start_at,
+                issues_processed,
                 len(all_stories)
             )
 
@@ -342,11 +346,11 @@ class AtlassianRequests:
             # total, something is wrong
             if len(data["issues"]) == 0 and next_page_token is not None:
                 logger.warning(
-                    "Received empty batch but more stories are expected"
+                    "Received empty batch but more issues are expected"
                 )
                 break
 
-        logger.info("Total stories retrieved: %d", len(all_stories))
+        logger.info("Total story rows retrieved: %d", len(all_stories))
         return all_stories
 
     def get_story_pull_requests(
