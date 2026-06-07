@@ -12,7 +12,6 @@ from dora_lead_time.atlassian_requests import (
     ConfigurationError,
 )
 from dora_lead_time.api_client import ApiError, AuthError, RateLimitError
-from dora_lead_time.database_processor import DatabaseOperationError
 from dora_lead_time.models import Project, Release, PullRequestIdentifier
 
 
@@ -301,11 +300,11 @@ def test_get_releases_uses_prefetched_projects(mock_get, atlassian_client):
     assert "https://test.atlassian.net/rest/api/3/project" not in requested_urls
 
 
-def test_get_releases_empty_prefetched_projects_raises_database_error(
+def test_get_releases_empty_prefetched_projects_raises_configuration_error(
     atlassian_client,
 ):
-    """Empty provided project list should fail as a database error."""
-    with pytest.raises(DatabaseOperationError, match="No software projects"):
+    """Empty provided project list should fail as a config error."""
+    with pytest.raises(ConfigurationError, match="No software projects"):
         atlassian_client.get_releases(
             date(2023, 6, 1),
             date(2023, 7, 31),
@@ -313,7 +312,7 @@ def test_get_releases_empty_prefetched_projects_raises_database_error(
         )
 
 
-def test_get_releases_non_software_prefetched_projects_raises_database_error(
+def test_get_releases_non_software_prefetched_projects_raises_configuration_error(
     atlassian_client,
 ):
     """Provided projects with no software type should fail."""
@@ -327,7 +326,7 @@ def test_get_releases_non_software_prefetched_projects_raises_database_error(
         )
     ]
 
-    with pytest.raises(DatabaseOperationError, match="No software projects"):
+    with pytest.raises(ConfigurationError, match="No software projects"):
         atlassian_client.get_releases(
             date(2023, 6, 1),
             date(2023, 7, 31),
@@ -336,13 +335,13 @@ def test_get_releases_non_software_prefetched_projects_raises_database_error(
 
 
 @patch("requests.get")
-def test_get_releases_fetched_non_software_projects_raises_database_error(
+def test_get_releases_fetched_non_software_projects_raises_configuration_error(
     mock_get, atlassian_client
 ):
     """Missing projects input should fail for projects-only contract."""
     mock_get.return_value = MockResponse({})
 
-    with pytest.raises(DatabaseOperationError, match="Projects are required"):
+    with pytest.raises(ConfigurationError, match="Projects are required"):
         atlassian_client.get_releases(date(2023, 6, 1), date(2023, 7, 31))
 
 
