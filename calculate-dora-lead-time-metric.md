@@ -42,12 +42,14 @@ For each pull request, lead time is calculated as:
 lead_time = release_date - earliest_commit_date + 1
 ```
 
+The `+ 1` counts the release day itself (inclusive day counting).
+
 The key here is using the **earliest commit date** rather than the pull request creation date. This captures the true beginning of work, even if the pull request was created later. The final DORA lead time metric is calculated by averaging all individual lead times over a specified time period, for a given set of projects.
 
 
 ## Manage This in Jira and GitHub
 
-To effectively use this approach, you need to understand how to manage the key components in Jira. Create Jira releases (or "versions") for each planned release, and set release dates when versions are published. Mark versions as "Released" once deployed. Assign the release to a project. In this context projects typically represent teams, products, or components. Stories are work items (features, bugs, etc.) included in releases. Use the Jira GitHub integration to connect your repositories. Reference Jira issues in pull request titles or descriptions** (e.g., "PROJ-123: Add new feature"). Use smart commits in your commit messages.
+To effectively use this approach, you need to understand how to manage the key components in Jira. Create Jira releases (or "versions") for each planned release, and set release dates when versions are published. Mark versions as "Released" once deployed. Assign the release to a project. In this context projects typically represent teams, products, or components. Stories are work items (features, bugs, etc.) included in releases. Use the Jira GitHub integration to connect your repositories. Reference Jira issues in pull request titles or descriptions (e.g., "PROJ-123: Add new feature"). Use smart commits in your commit messages.
 
 
 ## Using Python to Generate lead Time Reports
@@ -92,7 +94,12 @@ dora_lead_time.main.save_lead_time_charts(config)
 dora_lead_time.main.save_outlier_reports(config)
 ```
 
-> The full code is available on [GitHub](https://github.com/username/dora-lead-time-metric).
+If you prefer CLI usage over programmatic calls, you can use:
+`python -m dora_lead_time.main --build`,
+`python -m dora_lead_time.main --charts`, and
+`python -m dora_lead_time.main --reports`.
+
+> The full code is available on [GitHub](https://github.com/sualeh/dora-lead-time-metric).
 
 The report allows you to:
 

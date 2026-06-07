@@ -15,6 +15,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT = 30  # Timeout in seconds for HTTP requests
+PROGRESS_LOG_INTERVAL = 25
 
 
 class GitHubRequests:
@@ -97,8 +98,13 @@ class GitHubRequests:
 
         pr_details = []
 
+        total_prs = len(pull_requests)
+        prs_attempted = 0
         pr_processed = 0
+        pr_failed = 0
         for pr in pull_requests:
+            prs_attempted += 1
+
             owner = pr.pr_owner
             repo = pr.pr_repository
             pr_number = pr.pr_number
@@ -108,11 +114,26 @@ class GitHubRequests:
                 logger.error(
                     "No GitHub token found for organization: %s", owner
                 )
+                pr_failed += 1
+                if (
+                    prs_attempted % PROGRESS_LOG_INTERVAL == 0
+                    or prs_attempted == total_prs
+                ):
+                    logger.info(
+                        "Attempted %d/%d PRs; %d successful, %d failed",
+                        prs_attempted,
+                        total_prs,
+                        pr_processed,
+                        pr_failed,
+                    )
                 continue
 
             headers = {"Authorization": f"token {github_token}"}
 
-            api_url = f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}"
+            api_url = (
+                f"https://api.github.com/repos/{owner}/{repo}/pulls/"
+                f"{pr_number}"
+            )
             response = api_get(
                 api_url, ApiSource.GITHUB, headers,
                 timeout=self.request_timeout, raise_on_error=False,
@@ -123,6 +144,18 @@ class GitHubRequests:
                     "(HTTP %s); skipping",
                     owner, repo, pr_number, response.status_code
                 )
+                pr_failed += 1
+                if (
+                    prs_attempted % PROGRESS_LOG_INTERVAL == 0
+                    or prs_attempted == total_prs
+                ):
+                    logger.info(
+                        "Attempted %d/%d PRs; %d successful, %d failed",
+                        prs_attempted,
+                        total_prs,
+                        pr_processed,
+                        pr_failed,
+                    )
                 continue
             pr_data = response.json()
 
@@ -169,13 +202,6 @@ class GitHubRequests:
                 if pr_data["created_at"]
                 else None
             )
-            closed_date = (
-                datetime.fromisoformat(
-                    pr_data["closed_at"].replace("Z", "+00:00")
-                ).date()
-                if pr_data["closed_at"]
-                else None
-            )
 
             # Replace tuple creation with named tuple
             pr_detail = PullRequest(
@@ -194,11 +220,25 @@ class GitHubRequests:
 
             # Log progress
             pr_processed = pr_processed + 1
-            if pr_processed % 25 == 0:
+            if (
+                prs_attempted % PROGRESS_LOG_INTERVAL == 0
+                or prs_attempted == total_prs
+            ):
                 logger.info(
-                    "Processed %d/%d PRs", pr_processed, len(pull_requests)
+                    "Attempted %d/%d PRs; %d successful, %d failed",
+                    prs_attempted,
+                    total_prs,
+                    pr_processed,
+                    pr_failed,
                 )
-        logger.info("Processed %d/%d PRs", pr_processed, len(pull_requests))
+        logger.info(
+            "Completed PR detail lookup: %d/%d attempted, %d successful, "
+            "%d failed",
+            prs_attempted,
+            total_prs,
+            pr_processed,
+            pr_failed,
+        )
 
         return pr_details
 

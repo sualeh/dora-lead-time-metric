@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from dora_lead_time.database_processor import (
     DatabaseOperationError,
     DatabaseProcessor,
+    PULL_REQUEST_BATCH_SIZE,
 )
 from dora_lead_time.atlassian_requests import (
     AtlassianRequests,
@@ -27,6 +28,10 @@ logging.basicConfig(
     format="%(asctime)s `%(funcName)s` %(levelname)s:\n  %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+PROGRESS_CHECKPOINT_INTERVAL = 10
+CHART_IMAGE_DPI = 600
+CHART_IMAGE_FORMAT = "png"
 
 
 class LeadTimeConfiguration(NamedTuple):
@@ -94,10 +99,8 @@ def create_releases_database(config: LeadTimeConfiguration):
     """Coordinate the creation of the releases database.
 
     Args:
-        build_database (bool): Flag to determine whether to build the database
-        start_date (date): Start date for release search (inclusive)
-        end_date (date): End date for release search (inclusive)
-        org_to_env_var_map (dict[str, str]): Mapping from GitHub org to env var
+        config (LeadTimeConfiguration): Runtime configuration containing
+            sqlite path, date range, build flag, and GitHub token mapping.
     """
     logger.info(
         "Creating releases database between %s and %s",
@@ -153,19 +156,31 @@ def create_releases_database(config: LeadTimeConfiguration):
     # Step 5: Find stories without pull requests, get PRs and save them
     logger.info("-- 5. Getting pull requests for stories from Atlassian Jira")
     logger.info("Finding stories without pull requests")
+    pr_lookup_iteration = 0
     while True:
         story_keys = db_processor.retrieve_stories_without_pull_requests(
-            limit=100
+            limit=PULL_REQUEST_BATCH_SIZE
         )
         if story_keys:
+            pr_lookup_iteration += 1
             logger.info(
-                "Getting pull requests for %d stories",
+                "Pull requests iteration %d: "
+                "getting pull requests for %d stories",
+                pr_lookup_iteration,
                 len(story_keys)
             )
             story_pull_requests = atlassian_client.get_story_pull_requests(
                 story_keys
             )
             db_processor.save_story_pull_requests(story_pull_requests)
+
+            if pr_lookup_iteration % PROGRESS_CHECKPOINT_INTERVAL == 0:
+                logger.info(
+                    "Pull requests checkpoint at iteration %d: "
+                    "printing database summary",
+                    pr_lookup_iteration,
+                )
+                db_processor.print_summary()
         else:
             break
     db_processor.print_summary()
@@ -173,17 +188,29 @@ def create_releases_database(config: LeadTimeConfiguration):
     # Step 6: Find pull requests without details, get details and save them
     logger.info("-- 6. Getting details for pull requests from GitHub")
     logger.info("Finding pull requests without details")
+    pr_details_iteration = 0
     while True:
         pull_requests = db_processor.retrieve_pull_requests_without_details(
-            limit=100
+            limit=PULL_REQUEST_BATCH_SIZE
         )
         if pull_requests:
+            pr_details_iteration += 1
             logger.info(
-                "Getting details for %d pull requests",
+                "Pull requests details iteration %d: "
+                "getting details for %d pull requests",
+                pr_details_iteration,
                 len(pull_requests)
             )
             pr_details = github_client.get_pull_request_details(pull_requests)
             db_processor.save_pull_request_details(pr_details)
+
+            if pr_details_iteration % PROGRESS_CHECKPOINT_INTERVAL == 0:
+                logger.info(
+                    "Pull requests details checkpoint at iteration %d: "
+                    "printing database summary",
+                    pr_details_iteration,
+                )
+                db_processor.print_summary()
         else:
             break
     db_processor.print_summary()
@@ -261,7 +288,7 @@ def _save_lead_time_chart(
     start_date: date,
     end_date: date,
     title: str,
-    file_path: pathlib.Path = None
+    file_path: pathlib.Path
 ):
     """
     Saves a lead time chart as an image file.
@@ -277,9 +304,8 @@ def _save_lead_time_chart(
         start_date (date): The start date for the lead time data.
         end_date (date): The end date for the lead time data.
         title (str): The title of the chart.
-        file_path (pathlib.Path, optional): The file path where the chart
-            will be saved.
-            If not provided, a default path should be specified by the caller.
+        file_path (pathlib.Path): The file path where the chart will be
+            saved.
 
     Raises:
         ValueError: If any of the input parameters are invalid.
@@ -300,11 +326,11 @@ def _save_lead_time_chart(
     if plot is None:
         return
 
-    image_format = "png"
+    image_format = CHART_IMAGE_FORMAT
     # Save plot
     plot.savefig(
         file_path.with_suffix(f".{image_format}"),
-        dpi=600,
+        dpi=CHART_IMAGE_DPI,
         format=image_format
     )
     plot.close()  # Close plot to free memory

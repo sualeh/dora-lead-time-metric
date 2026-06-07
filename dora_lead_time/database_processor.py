@@ -3,8 +3,8 @@
 import logging
 import os
 import pathlib
-from datetime import date, datetime
 import sqlite3
+from datetime import date, datetime
 from dora_lead_time.models import PullRequestIdentifier, Project
 
 logging.basicConfig(
@@ -12,6 +12,52 @@ logging.basicConfig(
     format="%(asctime)s `%(funcName)s` %(levelname)s:\n  %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+PULL_REQUEST_BATCH_SIZE = 100
+
+
+def make_sqlite_connection(
+    sqlite_path: str,
+    check_exists: bool = True,
+) -> sqlite3.Connection:
+    """Create a SQLite connection with configured date/time conversion.
+
+    Args:
+        sqlite_path (str): Path to SQLite database file.
+        check_exists (bool, optional): When True, ensure the database file
+            exists before connecting. Defaults to True.
+
+    Returns:
+        sqlite3.Connection: A configured SQLite connection.
+
+    Raises:
+        FileNotFoundError: If the database file does not exist and
+            ``check_exists`` is True.
+    """
+    if check_exists and not os.path.exists(sqlite_path):
+        raise FileNotFoundError(
+            f"Database file does not exist: {sqlite_path}"
+        )
+
+    sqlite3.register_adapter(date, lambda val: val.isoformat())
+    sqlite3.register_adapter(datetime, lambda val: val.isoformat())
+
+    sqlite3.register_converter(
+        "date",
+        lambda val: date.fromisoformat(val.decode())
+    )
+    sqlite3.register_converter(
+        "timestamp",
+        lambda val: datetime.fromisoformat(val.decode())
+    )
+
+    conn = sqlite3.connect(
+        sqlite_path,
+        detect_types=sqlite3.PARSE_DECLTYPES,
+    )
+    logger.debug("Connected to %s", sqlite_path)
+
+    return conn
 
 
 class DatabaseOperationError(Exception):
@@ -25,8 +71,7 @@ class DatabaseProcessor:
         """Initialize the database processor with database path.
 
         Args:
-            sqlite_path (str, optional): Path to SQLite database file.
-                Defaults to the value set in constructor.
+            sqlite_path (str): Path to SQLite database file.
         """
         if not sqlite_path:
             raise ValueError("SQLite location not set")
@@ -46,41 +91,15 @@ class DatabaseProcessor:
             FileNotFoundError: If the database file does not exist
                 and check_exists is True
         """
-        sqlite_path = self.sqlite_path
-
-        if check_exists and not os.path.exists(sqlite_path):
-            raise FileNotFoundError(
-                f"Database file does not exist: {sqlite_path}"
-            )
-
-        # Register adapters for Python objects to SQLite types
-        sqlite3.register_adapter(date, lambda val: val.isoformat())
-        sqlite3.register_adapter(datetime, lambda val: val.isoformat())
-
-        # Register converters from SQLite types to Python objects
-        sqlite3.register_converter(
-            "date",
-            lambda val: date.fromisoformat(val.decode())
+        conn = make_sqlite_connection(
+            self.sqlite_path,
+            check_exists=check_exists,
         )
-        sqlite3.register_converter(
-            "timestamp",
-            lambda val: datetime.fromisoformat(val.decode())
-        )
-
-        conn = sqlite3.connect(
-            sqlite_path,
-            detect_types=sqlite3.PARSE_DECLTYPES
-        )
-        logger.debug("Connected to %s", sqlite_path)
 
         return conn
 
     def retrieve_all_projects(self) -> list[Project]:
         """Gets all projects from the database.
-
-        Args:
-            sqlite_path (str, optional): Path to SQLite database file.
-                Defaults to the value set in constructor.
 
         Returns:
             list[Project]: List of Project named tuples
@@ -151,9 +170,7 @@ class DatabaseProcessor:
         1. Projects contain releases
         2. Releases contain stories
         3. Stories are associated with pull requests
-        4. Pull requests contain commit information        Args:
-            sqlite_path (str, optional): Path to SQLite database file.
-                Defaults to the value set in constructor.
+        4. Pull requests contain commit information
 
         Raises:
             Exception: If there's an error creating the schema
@@ -201,8 +218,6 @@ class DatabaseProcessor:
 
         Args:
             projects: List of project tuples to save
-            sqlite_path (str, optional): Path to SQLite database file.
-                Defaults to the value set in constructor.
 
         Raises:
             Exception: If there's an error saving projects to the database
@@ -253,8 +268,6 @@ class DatabaseProcessor:
         """Update project type for given project keys in the database.
 
         Args:
-            sqlite_path (str, optional): Path to SQLite database file.
-                Defaults to the value set in constructor.
             project_keys (list[str]): List of project keys to update
             project_type (str): Project type to set (e.g., 'app', 'mobile')
 
@@ -304,8 +317,6 @@ class DatabaseProcessor:
 
         Args:
             releases: List of release tuples to save
-            sqlite_path (str, optional): Path to SQLite database file.
-                Defaults to the value set in constructor.
 
         Raises:
             Exception: If there's an error saving releases to the database
@@ -409,10 +420,6 @@ class DatabaseProcessor:
     def retrieve_releases_without_stories(self) -> list[str]:
         """Get releases without associated stories from the database.
 
-        Args:
-            sqlite_path (str, optional): Path to SQLite database file.
-                Defaults to the value set in constructor.
-
         Returns:
             list[str]: List of release internal IDs that don't have any
                 associated stories
@@ -466,8 +473,6 @@ class DatabaseProcessor:
 
         Args:
             stories: List of story tuples to save
-            sqlite_path (str, optional): Path to SQLite database file.
-                Defaults to the value set in constructor.
 
         Raises:
             Exception: If there's an error saving stories to the database
@@ -539,7 +544,10 @@ class DatabaseProcessor:
                 FROM
                     stage_stories
                 JOIN releases
-                    ON stage_stories.release_internal_id = releases.release_internal_id
+                    ON (
+                        stage_stories.release_internal_id
+                        = releases.release_internal_id
+                    )
                 """
             )
             logger.info("Inserted %d stories", cursor.rowcount)
@@ -572,14 +580,14 @@ class DatabaseProcessor:
 
     def retrieve_stories_without_pull_requests(
         self,
-        limit: int = 0,
+        limit: int = PULL_REQUEST_BATCH_SIZE,
     ) -> list[str]:
         """Retrieves story keys that don't have associated pull requests for
             given projects and date range.
 
         Args:
-            sqlite_path (str, optional): Path to SQLite database file.
-                Defaults to the value set in constructor.
+            limit (int, optional): Maximum number of records to retrieve.
+                Defaults to 0.
 
         Returns:
             List of story keys that don't have pull requests mapped to them
@@ -591,19 +599,22 @@ class DatabaseProcessor:
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
-
-            cursor.execute(f"""
+            query = f"""
                 SELECT
                     stories.story_key
                 FROM
                     stories
                     LEFT OUTER JOIN stories_pull_request_counts
-                        ON stories.story_key = stories_pull_request_counts.story_key
+                        ON (
+                            stories.story_key
+                            = stories_pull_request_counts.story_key
+                        )
                 WHERE
                     stories_pull_request_counts.story_key IS NULL
                 LIMIT {limit}
                 """
-            )
+
+            cursor.execute(query)
 
             story_keys = cursor.fetchall()
             story_keys = [story_key[0] for story_key in story_keys]
@@ -634,9 +645,8 @@ class DatabaseProcessor:
         """Saves GitHub pull request mappings for Jira stories to the database.
 
         Args:
-            stories_pull_requests: Mapping of story keys to pull request URLs
-            sqlite_path (str, optional): Path to SQLite database file.
-                Defaults to the value set in constructor.
+            stories_pull_requests_map: Mapping of story keys to pull
+                request URLs
 
         Raises:
             Exception: If there's an error saving data to the database
@@ -724,8 +734,8 @@ class DatabaseProcessor:
             cursor.execute(
                 """
                 INSERT OR IGNORE INTO stories_pull_requests(
-				  story_id,
-                  pr_id
+                                        story_id,
+                                        pr_id
                 )
                 SELECT
                     stories.id,
@@ -733,12 +743,18 @@ class DatabaseProcessor:
                 FROM
                     stage_stories_pull_requests
                     JOIN stories
-                        ON stage_stories_pull_requests.story_key = stories.story_key
+                        ON (
+                            stage_stories_pull_requests.story_key
+                            = stories.story_key
+                        )
                     JOIN pull_requests
                         ON (
-                            stage_stories_pull_requests.pr_owner = pull_requests.pr_owner
-                            AND stage_stories_pull_requests.pr_repository = pull_requests.pr_repository
-                            AND stage_stories_pull_requests.pr_number = pull_requests.pr_number
+                            stage_stories_pull_requests.pr_owner
+                            = pull_requests.pr_owner
+                            AND stage_stories_pull_requests.pr_repository
+                            = pull_requests.pr_repository
+                            AND stage_stories_pull_requests.pr_number
+                            = pull_requests.pr_number
                         )
                 """
             )
@@ -790,13 +806,13 @@ class DatabaseProcessor:
 
     def retrieve_pull_requests_without_details(
         self,
-        limit: int = 0,
+        limit: int = PULL_REQUEST_BATCH_SIZE,
     ) -> list[PullRequestIdentifier]:
         """Gets pull request URLs that have no details from the database.
 
         Args:
-            sqlite_path (str, optional): Path to SQLite database file.
-                Defaults to the value set in constructor.
+            limit (int, optional): Maximum number of records to retrieve.
+                Defaults to 0.
 
         Returns:
             list[PullRequestIdentifier]: List of PullRequestIdentifier objects
@@ -808,9 +824,7 @@ class DatabaseProcessor:
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
-
-            cursor.execute(
-                f"""
+            query = f"""
                 SELECT
                     pull_requests.id,
                     pull_requests.pr_owner,
@@ -822,7 +836,8 @@ class DatabaseProcessor:
                     pull_requests.pr_title IS NULL
                 LIMIT {limit}
                 """
-            )
+
+            cursor.execute(query)
 
             rows = cursor.fetchall()
             pull_requests = [
@@ -857,15 +872,13 @@ class DatabaseProcessor:
         return pull_requests
 
     def save_pull_request_details(
-        self, pull_request_details, sqlite_path=None
+        self, pull_request_details
     ) -> None:
         """Saves detailed information about each GitHub pull request to the
             database.
 
         Args:
             pull_request_details: List of PullRequest objects with details
-            sqlite_path (str, optional): The path to the SQLite database file.
-                Defaults to the value set in constructor.
 
         Raises:
             Exception: If there's an error saving data to the database
@@ -964,6 +977,12 @@ class DatabaseProcessor:
         """
         conn = None
         try:
+            database_name = (
+                self.sqlite_path
+                if self.sqlite_path == ":memory:"
+                else pathlib.Path(self.sqlite_path).name
+            )
+
             conn = self._get_connection()
             cursor = conn.cursor()
 
@@ -984,10 +1003,16 @@ class DatabaseProcessor:
             rows = cursor.fetchall()
 
             if not rows:
-                logger.info("No summary data available in the database")
+                logger.info(
+                    "No summary data available in database: %s",
+                    database_name,
+                )
                 return
 
-            summary_lines = ["Data summary:"]
+            summary_lines = [
+                f"Database: {database_name}",
+                "Data summary:",
+            ]
             for row in rows:
                 entity_type, count, earliest_date, latest_date = row
                 summary_lines.append(

@@ -24,6 +24,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+JIRA_PAGE_SIZE = 25
+PROGRESS_LOG_INTERVAL = 25
+
 
 class ConfigurationError(Exception):
     """Raised when required application configuration is missing."""
@@ -269,8 +272,8 @@ class AtlassianRequests:
         """
 
         # Initialize variables for pagination
-        start_at = 0
-        max_results = 25
+        issues_processed = 0
+        max_results = JIRA_PAGE_SIZE
         all_stories = []
         is_last = False
         next_page_token = None
@@ -287,7 +290,10 @@ class AtlassianRequests:
                 ),
             }
 
-            logger.info("Fetching stories batch starting at %s", start_at)
+            logger.info(
+                "Fetching next issues batch after %s issues processed",
+                issues_processed,
+            )
             response = api_get(
                 url, ApiSource.ATLASSIAN, headers,
                 auth=auth, params=params, timeout=self.request_timeout,
@@ -325,16 +331,17 @@ class AtlassianRequests:
                         all_stories.append(story_details)
 
             # Move to next batch
-            start_at += len(data["issues"])
+            issues_processed += len(data["issues"])
             logger.info(
                 textwrap.dedent("""
-                    Retrieved %d stories, for batch starting at %d
-                    (Story counts may not match if they are part of
-                    more than one release)
-                    Total stories retrieved: %d
+                    Retrieved %d issues in current batch
+                    Issues processed so far: %d
+                    (Story row counts may not match unique issues if they are
+                    part of more than one release)
+                    Total story rows retrieved: %d
                 """).strip(),
                 len(data["issues"]),
-                start_at,
+                issues_processed,
                 len(all_stories)
             )
 
@@ -342,11 +349,11 @@ class AtlassianRequests:
             # total, something is wrong
             if len(data["issues"]) == 0 and next_page_token is not None:
                 logger.warning(
-                    "Received empty batch but more stories are expected"
+                    "Received empty batch but more issues are expected"
                 )
                 break
 
-        logger.info("Total stories retrieved: %d", len(all_stories))
+        logger.info("Total story rows retrieved: %d", len(all_stories))
         return all_stories
 
     def get_story_pull_requests(
@@ -388,10 +395,15 @@ class AtlassianRequests:
         }
         auth = (self.email, self.token)
 
+        total_stories = len(story_numbers)
+        stories_attempted = 0
         stories_processed = 0
         stories_processed_without_prs = 0
+        failed_story_requests = 0
         story_to_pr_urls = {}
         for story in story_numbers:
+            stories_attempted += 1
+
             # First get the issue id
             issue_url = (
                 f"https://{self.jira_instance}/rest/api/3/issue/"
@@ -410,6 +422,7 @@ class AtlassianRequests:
                     issue_response.status_code,
                     issue_response.text,
                 )
+                failed_story_requests += 1
                 story_to_pr_urls[story] = []
                 continue
 
@@ -437,6 +450,7 @@ class AtlassianRequests:
                     dev_response.status_code,
                     dev_response.text,
                 )
+                failed_story_requests += 1
                 story_to_pr_urls[story] = []
                 continue
 
@@ -467,15 +481,26 @@ class AtlassianRequests:
             stories_processed += 1
             if not pr_urls:
                 stories_processed_without_prs += 1
-            if stories_processed % 25 == 0:
+            if (
+                stories_attempted % PROGRESS_LOG_INTERVAL == 0
+                or stories_attempted == total_stories
+            ):
                 logger.info(
-                    "Processed %d stories, %d without PRs",
+                    "Attempted %d/%d stories; %d successful lookups, "
+                    "%d failed lookups, %d stories without PRs",
+                    stories_attempted,
+                    total_stories,
                     stories_processed,
+                    failed_story_requests,
                     stories_processed_without_prs,
                 )
         logger.info(
-            "Processed %d stories, %d without PRs",
+            "Completed story PR lookup: %d/%d attempted, %d successful, "
+            "%d failed, %d without PRs",
+            stories_attempted,
+            total_stories,
             stories_processed,
+            failed_story_requests,
             stories_processed_without_prs,
         )
 
