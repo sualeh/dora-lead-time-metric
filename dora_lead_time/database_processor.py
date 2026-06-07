@@ -570,10 +570,7 @@ class DatabaseProcessor:
             if conn:
                 conn.close()
 
-    def retrieve_stories_without_pull_requests(
-        self,
-        limit: int = 0,
-    ) -> list[str]:
+    def retrieve_stories_without_pull_requests(self) -> list[str]:
         """Retrieves story keys that don't have associated pull requests for
             given projects and date range.
 
@@ -592,7 +589,7 @@ class DatabaseProcessor:
             conn = self._get_connection()
             cursor = conn.cursor()
 
-            cursor.execute(f"""
+            cursor.execute("""
                 SELECT
                     stories.story_key
                 FROM
@@ -601,7 +598,6 @@ class DatabaseProcessor:
                         ON stories.story_key = stories_pull_request_counts.story_key
                 WHERE
                     stories_pull_request_counts.story_key IS NULL
-                LIMIT {limit}
                 """
             )
 
@@ -790,7 +786,6 @@ class DatabaseProcessor:
 
     def retrieve_pull_requests_without_details(
         self,
-        limit: int = 0,
     ) -> list[PullRequestIdentifier]:
         """Gets pull request URLs that have no details from the database.
 
@@ -810,7 +805,7 @@ class DatabaseProcessor:
             cursor = conn.cursor()
 
             cursor.execute(
-                f"""
+                """
                 SELECT
                     pull_requests.id,
                     pull_requests.pr_owner,
@@ -820,7 +815,6 @@ class DatabaseProcessor:
                     pull_requests
                 WHERE
                     pull_requests.pr_title IS NULL
-                LIMIT {limit}
                 """
             )
 

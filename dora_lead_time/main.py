@@ -153,39 +153,29 @@ def create_releases_database(config: LeadTimeConfiguration):
     # Step 5: Find stories without pull requests, get PRs and save them
     logger.info("-- 5. Getting pull requests for stories from Atlassian Jira")
     logger.info("Finding stories without pull requests")
-    while True:
-        story_keys = db_processor.retrieve_stories_without_pull_requests(
-            limit=100
+    story_keys = db_processor.retrieve_stories_without_pull_requests()
+    if story_keys:
+        logger.info(
+            "Getting pull requests for %d stories",
+            len(story_keys)
         )
-        if story_keys:
-            logger.info(
-                "Getting pull requests for %d stories",
-                len(story_keys)
-            )
-            story_pull_requests = atlassian_client.get_story_pull_requests(
-                story_keys
-            )
-            db_processor.save_story_pull_requests(story_pull_requests)
-        else:
-            break
+        story_pull_requests = atlassian_client.get_story_pull_requests(
+            story_keys
+        )
+        db_processor.save_story_pull_requests(story_pull_requests)
     db_processor.print_summary()
 
     # Step 6: Find pull requests without details, get details and save them
     logger.info("-- 6. Getting details for pull requests from GitHub")
     logger.info("Finding pull requests without details")
-    while True:
-        pull_requests = db_processor.retrieve_pull_requests_without_details(
-            limit=100
+    pull_requests = db_processor.retrieve_pull_requests_without_details()
+    if pull_requests:
+        logger.info(
+            "Getting details for %d pull requests",
+            len(pull_requests)
         )
-        if pull_requests:
-            logger.info(
-                "Getting details for %d pull requests",
-                len(pull_requests)
-            )
-            pr_details = github_client.get_pull_request_details(pull_requests)
-            db_processor.save_pull_request_details(pr_details)
-        else:
-            break
+        pr_details = github_client.get_pull_request_details(pull_requests)
+        db_processor.save_pull_request_details(pr_details)
     db_processor.print_summary()
 
     logger.info("-- 7. Release database creation completed successfully")

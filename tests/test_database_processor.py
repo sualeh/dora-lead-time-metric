@@ -220,3 +220,72 @@ def test_save_releases_raises_on_missing_schema(db_processor):
     releases = [(None, "REL-1", "Release 1", "desc", "2024-01-01", "PROJ1")]
     with pytest.raises(DatabaseOperationError):
         db_processor.save_releases(releases)
+
+
+def test_retrieve_stories_without_pull_requests_returns_all_unmapped_stories(
+    db_processor
+):
+    """Returns all stories that have not had PR lookup attempted yet."""
+    db_processor.create_schema()
+
+    conn = sqlite3.connect(db_processor.sqlite_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO projects (project_internal_id, project_key, project_title)
+        VALUES ('P1', 'PROJ1', 'Project 1')
+        """
+    )
+    cursor.execute(
+        """
+        INSERT INTO releases (release_internal_id, release_title, project_id)
+        VALUES ('REL-1', 'Release 1', 1)
+        """
+    )
+    cursor.executemany(
+        """
+        INSERT INTO stories (story_key, release_id)
+        VALUES (?, 1)
+        """,
+        [("STORY-1",), ("STORY-2",), ("STORY-3",)],
+    )
+    cursor.execute(
+        """
+        INSERT INTO stories_pull_request_counts (story_key, pr_count)
+        VALUES ('STORY-2', 0)
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    story_keys = db_processor.retrieve_stories_without_pull_requests()
+
+    assert set(story_keys) == {"STORY-1", "STORY-3"}
+
+
+def test_retrieve_pull_requests_without_details_returns_all_incomplete_rows(
+    db_processor
+):
+    """Returns all PR identifiers where details are still missing."""
+    db_processor.create_schema()
+
+    conn = sqlite3.connect(db_processor.sqlite_path)
+    cursor = conn.cursor()
+    cursor.executemany(
+        """
+        INSERT INTO pull_requests
+        (id, pr_title, pr_owner, pr_repository, pr_number)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        [
+            (1, None, "org", "repo", "1"),
+            (2, "Ready", "org", "repo", "2"),
+            (3, None, "org", "repo", "3"),
+        ],
+    )
+    conn.commit()
+    conn.close()
+
+    pull_requests = db_processor.retrieve_pull_requests_without_details()
+
+    assert {pr.id for pr in pull_requests} == {1, 3}

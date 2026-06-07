@@ -86,23 +86,12 @@ permanent table is unchanged.
 
 ---
 
-### Mechanism 4: Per-batch commits with limits
+### Mechanism 4: Step-level commits
 
-Steps 5 and 6 in `main.py` use `while True` loops that retrieve and
-process 100 items per iteration, committing after each batch:
-
-```python
-while True:
-    items = db.retrieve_items_without_details(limit=100)
-    if not items:
-        break
-    details = api_client.get_details(items)
-    db.save_details(details)   # commits inside
-```
-
-Each committed batch is immediately durable. A crash after any commit
-leaves all prior batches intact in the database; the next run resumes
-from the first uncommitted item.
+Each `save_*` operation commits its transaction before moving to the
+next step in `main.py`. If a run aborts after a successful save, those
+changes remain durable and are skipped on the next run by the
+"not-yet-done" sentinel queries described above.
 
 ---
 
