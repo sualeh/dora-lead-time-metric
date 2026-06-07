@@ -392,10 +392,15 @@ class AtlassianRequests:
         }
         auth = (self.email, self.token)
 
+        total_stories = len(story_numbers)
+        stories_attempted = 0
         stories_processed = 0
         stories_processed_without_prs = 0
+        failed_story_requests = 0
         story_to_pr_urls = {}
         for story in story_numbers:
+            stories_attempted += 1
+
             # First get the issue id
             issue_url = (
                 f"https://{self.jira_instance}/rest/api/3/issue/"
@@ -414,6 +419,7 @@ class AtlassianRequests:
                     issue_response.status_code,
                     issue_response.text,
                 )
+                failed_story_requests += 1
                 story_to_pr_urls[story] = []
                 continue
 
@@ -441,6 +447,7 @@ class AtlassianRequests:
                     dev_response.status_code,
                     dev_response.text,
                 )
+                failed_story_requests += 1
                 story_to_pr_urls[story] = []
                 continue
 
@@ -471,15 +478,26 @@ class AtlassianRequests:
             stories_processed += 1
             if not pr_urls:
                 stories_processed_without_prs += 1
-            if stories_processed % 25 == 0:
+            if (
+                stories_attempted % 25 == 0
+                or stories_attempted == total_stories
+            ):
                 logger.info(
-                    "Processed %d stories, %d without PRs",
+                    "Attempted %d/%d stories; %d successful lookups, "
+                    "%d failed lookups, %d stories without PRs",
+                    stories_attempted,
+                    total_stories,
                     stories_processed,
+                    failed_story_requests,
                     stories_processed_without_prs,
                 )
         logger.info(
-            "Processed %d stories, %d without PRs",
+            "Completed story PR lookup: %d/%d attempted, %d successful, "
+            "%d failed, %d without PRs",
+            stories_attempted,
+            total_stories,
             stories_processed,
+            failed_story_requests,
             stories_processed_without_prs,
         )
 

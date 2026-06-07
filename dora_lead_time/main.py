@@ -153,19 +153,30 @@ def create_releases_database(config: LeadTimeConfiguration):
     # Step 5: Find stories without pull requests, get PRs and save them
     logger.info("-- 5. Getting pull requests for stories from Atlassian Jira")
     logger.info("Finding stories without pull requests")
+    step_5_iteration = 0
     while True:
         story_keys = db_processor.retrieve_stories_without_pull_requests(
             limit=100
         )
         if story_keys:
+            step_5_iteration += 1
             logger.info(
-                "Getting pull requests for %d stories",
+                "Pull requests iteration %d: getting pull requests for %d stories",
+                step_5_iteration,
                 len(story_keys)
             )
             story_pull_requests = atlassian_client.get_story_pull_requests(
                 story_keys
             )
             db_processor.save_story_pull_requests(story_pull_requests)
+
+            if step_5_iteration % 10 == 0:
+                logger.info(
+                    "Pull requests checkpoint at iteration %d: "
+                    "printing database summary",
+                    step_5_iteration,
+                )
+                db_processor.print_summary()
         else:
             break
     db_processor.print_summary()
@@ -173,17 +184,28 @@ def create_releases_database(config: LeadTimeConfiguration):
     # Step 6: Find pull requests without details, get details and save them
     logger.info("-- 6. Getting details for pull requests from GitHub")
     logger.info("Finding pull requests without details")
+    step_6_iteration = 0
     while True:
         pull_requests = db_processor.retrieve_pull_requests_without_details(
             limit=100
         )
         if pull_requests:
+            step_6_iteration += 1
             logger.info(
-                "Getting details for %d pull requests",
+                "Pull requests details iteration %d: getting details for %d pull requests",
+                step_6_iteration,
                 len(pull_requests)
             )
             pr_details = github_client.get_pull_request_details(pull_requests)
             db_processor.save_pull_request_details(pr_details)
+
+            if step_6_iteration % 10 == 0:
+                logger.info(
+                    "Pull requests details checkpoint at iteration %d: "
+                    "printing database summary",
+                    step_6_iteration,
+                )
+                db_processor.print_summary()
         else:
             break
     db_processor.print_summary()
