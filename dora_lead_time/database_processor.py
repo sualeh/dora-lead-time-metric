@@ -47,7 +47,7 @@ def make_sqlite_connection(
         lambda val: date.fromisoformat(val.decode())
     )
     sqlite3.register_converter(
-        "timestamp",
+        "datetime",
         lambda val: datetime.fromisoformat(val.decode())
     )
 
@@ -343,7 +343,7 @@ class DatabaseProcessor:
                     release_internal_id VARCHAR(1024),
                     release_title VARCHAR(1024),
                     release_description VARCHAR(2048),
-                    release_date VARCHAR(1024), -- DATE
+                    release_date DATE,
                     project_key VARCHAR(1024),
                     UNIQUE(release_internal_id)
                 )
@@ -500,8 +500,8 @@ class DatabaseProcessor:
                     story_title VARCHAR(1024),
                     story_type VARCHAR(1024),
                     release_internal_id VARCHAR(1024),
-                    story_created VARCHAR(1024), -- DATETIME
-                    story_resolved VARCHAR(1024), -- DATETIME
+                    story_created DATETIME,
+                    story_resolved DATETIME,
                     UNIQUE(story_key, release_internal_id)
                 )
                 """
