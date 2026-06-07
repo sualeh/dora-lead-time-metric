@@ -67,9 +67,8 @@ class GitHubRequests:
             )
             user_info = user_response.json()
             logger.info(
-                "Authenticated GitHub user for %s: %s (name=%s, url=%s)",
+                "Authenticated GitHub user for %s: (name=%s, url=%s)",
                 org,
-                user_info.get("login"),
                 user_info.get("name"),
                 user_info.get("html_url") or user_info.get("url"),
             )

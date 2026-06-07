@@ -11,7 +11,6 @@ from dora_lead_time.api_client import (
     ApiSource,
     api_get,
 )
-from dora_lead_time.database_processor import DatabaseOperationError
 from dora_lead_time.models import (
     Project,
     Release,
@@ -91,9 +90,8 @@ class AtlassianRequests:
 
         user_info = response.json()
         logger.info(
-            "Authenticated Jira user: %s (accountId=%s, self=%s)",
+            "Authenticated Jira user: (name=%s, url=%s)",
             user_info.get("displayName"),
-            user_info.get("accountId"),
             user_info.get("self"),
         )
         return user_info
@@ -159,7 +157,7 @@ class AtlassianRequests:
             List[Release]: List of Release named tuples
 
         Raises:
-            DatabaseOperationError: If there are no projects to process
+            ConfigurationError: If there are no projects to process
             requests.RequestException: If there's an error connecting to Jira
         """
 
@@ -171,7 +169,7 @@ class AtlassianRequests:
         jira_base_url = f"https://{self.jira_instance}/rest/api/3"
 
         if projects is None:
-            raise DatabaseOperationError(
+            raise ConfigurationError(
                 "Projects are required to retrieve releases"
             )
 
@@ -182,7 +180,7 @@ class AtlassianRequests:
         ]
 
         if not project_keys:
-            raise DatabaseOperationError(
+            raise ConfigurationError(
                 "No software projects available to retrieve releases"
             )
 
