@@ -37,14 +37,33 @@ def github_client():
         },
     ):
         with patch("requests.get") as mock_get:
-            mock_get.side_effect = [
-                MockResponse({"login": "org1-user", "name": "Org1 User", "html_url": "https://github.com/org1-user"}),
-                MockResponse({"login": "org2-user", "name": "Org2 User", "html_url": "https://github.com/org2-user"}),
-            ]
-            return GitHubRequests({
-                "Org1": "GITHUB_TOKEN_ORG1",
-                "Org2": "GITHUB_TOKEN_ORG2"
-            })
+            def side_effect(*args, **kwargs):
+                token = kwargs.get("headers", {}).get("Authorization")
+                if token == "token test-token-org1":
+                    return MockResponse(
+                        {
+                            "login": "org1-user",
+                            "name": "Org1 User",
+                            "html_url": "https://github.com/org1-user",
+                        }
+                    )
+                if token == "token test-token-org2":
+                    return MockResponse(
+                        {
+                            "login": "org2-user",
+                            "name": "Org2 User",
+                            "html_url": "https://github.com/org2-user",
+                        }
+                    )
+                return MockResponse({}, status_code=401)
+
+            mock_get.side_effect = side_effect
+            return GitHubRequests(
+                {
+                    "Org1": "GITHUB_TOKEN_ORG1",
+                    "Org2": "GITHUB_TOKEN_ORG2",
+                }
+            )
 
 
 def test_init_with_token_map():
