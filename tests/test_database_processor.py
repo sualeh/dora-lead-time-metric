@@ -8,6 +8,7 @@ from dora_lead_time.database_processor import (
     DatabaseOperationError,
     DatabaseProcessor,
     PULL_REQUEST_BATCH_SIZE,
+    make_sqlite_connection,
 )
 from dora_lead_time.models import Project, PullRequestIdentifier, PullRequest
 
@@ -50,6 +51,23 @@ def test_create_schema(db_processor):
     views = [row[0] for row in cursor.fetchall()]
 
     assert "lead_times" in views
+
+    # New database files should use typed date declarations.
+    cursor.execute("PRAGMA table_info(releases);")
+    release_columns = {row[1]: row[2].upper() for row in cursor.fetchall()}
+    assert release_columns["release_date"] == "DATE"
+
+    cursor.execute("PRAGMA table_info(stories);")
+    story_columns = {row[1]: row[2].upper() for row in cursor.fetchall()}
+    assert story_columns["story_created"] == "DATETIME"
+    assert story_columns["story_resolved"] == "DATETIME"
+
+    cursor.execute("PRAGMA table_info(pull_requests);")
+    pr_columns = {row[1]: row[2].upper() for row in cursor.fetchall()}
+    assert pr_columns["pr_open"] == "DATE"
+    assert pr_columns["pr_close"] == "DATE"
+    assert pr_columns["earliest_commit_date"] == "DATE"
+    assert pr_columns["latest_commit_date"] == "DATE"
 
     conn.close()
 
@@ -284,3 +302,75 @@ def test_retrieve_pull_requests_without_details_honors_explicit_limit(
         isinstance(pull_request, PullRequestIdentifier)
         for pull_request in pending_pull_requests
     )
+
+
+def test_connection_converts_typed_date_columns(temp_db_path):
+    """Typed DATE and DATETIME declarations should use converters."""
+    conn = make_sqlite_connection(temp_db_path, check_exists=False)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        CREATE TABLE typed_dates (
+            release_date DATE,
+            story_created DATETIME
+        )
+        """
+    )
+    cursor.execute(
+        """
+        INSERT INTO typed_dates (release_date, story_created)
+        VALUES (?, ?)
+        """,
+        (date(2024, 1, 1), datetime(2024, 1, 1, 12, 30, 45)),
+    )
+    conn.commit()
+
+    cursor.execute(
+        """
+        SELECT release_date, story_created
+        FROM typed_dates
+        """
+    )
+    release_date, story_created = cursor.fetchone()
+    conn.close()
+
+    assert isinstance(release_date, date)
+    assert isinstance(story_created, datetime)
+    assert release_date == date(2024, 1, 1)
+    assert story_created == datetime(2024, 1, 1, 12, 30, 45)
+
+
+def test_connection_keeps_legacy_text_date_columns_as_strings(temp_db_path):
+    """Legacy VARCHAR/TEXT declarations should still read as strings."""
+    conn = make_sqlite_connection(temp_db_path, check_exists=False)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        CREATE TABLE legacy_dates (
+            release_date VARCHAR(1024),
+            story_created TEXT
+        )
+        """
+    )
+    cursor.execute(
+        """
+        INSERT INTO legacy_dates (release_date, story_created)
+        VALUES (?, ?)
+        """,
+        ("2024-01-01", "2024-01-01T12:30:45"),
+    )
+    conn.commit()
+
+    cursor.execute(
+        """
+        SELECT release_date, story_created
+        FROM legacy_dates
+        """
+    )
+    release_date, story_created = cursor.fetchone()
+    conn.close()
+
+    assert isinstance(release_date, str)
+    assert isinstance(story_created, str)
+    assert release_date == "2024-01-01"
+    assert story_created == "2024-01-01T12:30:45"

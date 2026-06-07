@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS releases (
 	release_internal_id VARCHAR(1024),
 	release_title VARCHAR(1024),
 	release_description VARCHAR(2048),
-	release_date VARCHAR(1024), -- DATE
+	release_date DATE,
 	project_id INTEGER,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	UNIQUE(release_internal_id, project_id),
@@ -26,8 +26,8 @@ CREATE TABLE IF NOT EXISTS stories (
 	story_key VARCHAR(1024),
 	story_title VARCHAR(1024),
 	story_type VARCHAR(1024),
-	story_created VARCHAR(1024), -- DATE
-	story_resolved VARCHAR(1024), -- DATE
+	story_created DATETIME,
+	story_resolved DATETIME,
 	release_id VARCHAR(1024),
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	UNIQUE(story_key, release_id),
@@ -40,11 +40,11 @@ CREATE TABLE IF NOT EXISTS pull_requests (
 	pr_owner VARCHAR(1024),
 	pr_repository VARCHAR(1024),
 	pr_number VARCHAR(1024),
-	pr_open VARCHAR(1024), -- DATE
-	pr_close VARCHAR(1024), -- DATE
+	pr_open DATE,
+	pr_close DATE,
 	commit_count INTEGER,
-	earliest_commit_date VARCHAR(1024), -- DATE
-	latest_commit_date VARCHAR(1024), -- DATE
+	earliest_commit_date DATE,
+	latest_commit_date DATE,
 	pr_url VARCHAR(1024) GENERATED ALWAYS
 	  AS (
 		'https://github.com/' || pr_owner || '/' ||
