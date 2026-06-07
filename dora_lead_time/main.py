@@ -28,6 +28,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+PULL_REQUEST_BATCH_SIZE = 100
+PROGRESS_CHECKPOINT_INTERVAL = 10
+CHART_IMAGE_DPI = 600
+CHART_IMAGE_FORMAT = "png"
+
 
 class LeadTimeConfiguration(NamedTuple):
     """Configuration for lead time analysis."""
@@ -153,16 +158,17 @@ def create_releases_database(config: LeadTimeConfiguration):
     # Step 5: Find stories without pull requests, get PRs and save them
     logger.info("-- 5. Getting pull requests for stories from Atlassian Jira")
     logger.info("Finding stories without pull requests")
-    step_5_iteration = 0
+    pr_lookup_iteration = 0
     while True:
         story_keys = db_processor.retrieve_stories_without_pull_requests(
-            limit=100
+            limit=PULL_REQUEST_BATCH_SIZE
         )
         if story_keys:
-            step_5_iteration += 1
+            pr_lookup_iteration += 1
             logger.info(
-                "Pull requests iteration %d: getting pull requests for %d stories",
-                step_5_iteration,
+                "Pull requests iteration %d: "
+                "getting pull requests for %d stories",
+                pr_lookup_iteration,
                 len(story_keys)
             )
             story_pull_requests = atlassian_client.get_story_pull_requests(
@@ -170,11 +176,11 @@ def create_releases_database(config: LeadTimeConfiguration):
             )
             db_processor.save_story_pull_requests(story_pull_requests)
 
-            if step_5_iteration % 10 == 0:
+            if pr_lookup_iteration % PROGRESS_CHECKPOINT_INTERVAL == 0:
                 logger.info(
                     "Pull requests checkpoint at iteration %d: "
                     "printing database summary",
-                    step_5_iteration,
+                    pr_lookup_iteration,
                 )
                 db_processor.print_summary()
         else:
@@ -184,26 +190,27 @@ def create_releases_database(config: LeadTimeConfiguration):
     # Step 6: Find pull requests without details, get details and save them
     logger.info("-- 6. Getting details for pull requests from GitHub")
     logger.info("Finding pull requests without details")
-    step_6_iteration = 0
+    pr_details_iteration = 0
     while True:
         pull_requests = db_processor.retrieve_pull_requests_without_details(
-            limit=100
+            limit=PULL_REQUEST_BATCH_SIZE
         )
         if pull_requests:
-            step_6_iteration += 1
+            pr_details_iteration += 1
             logger.info(
-                "Pull requests details iteration %d: getting details for %d pull requests",
-                step_6_iteration,
+                "Pull requests details iteration %d: "
+                "getting details for %d pull requests",
+                pr_details_iteration,
                 len(pull_requests)
             )
             pr_details = github_client.get_pull_request_details(pull_requests)
             db_processor.save_pull_request_details(pr_details)
 
-            if step_6_iteration % 10 == 0:
+            if pr_details_iteration % PROGRESS_CHECKPOINT_INTERVAL == 0:
                 logger.info(
                     "Pull requests details checkpoint at iteration %d: "
                     "printing database summary",
-                    step_6_iteration,
+                    pr_details_iteration,
                 )
                 db_processor.print_summary()
         else:
@@ -322,11 +329,11 @@ def _save_lead_time_chart(
     if plot is None:
         return
 
-    image_format = "png"
+    image_format = CHART_IMAGE_FORMAT
     # Save plot
     plot.savefig(
         file_path.with_suffix(f".{image_format}"),
-        dpi=600,
+        dpi=CHART_IMAGE_DPI,
         format=image_format
     )
     plot.close()  # Close plot to free memory

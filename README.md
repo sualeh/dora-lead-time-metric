@@ -55,6 +55,8 @@ This project uses [Poetry](https://python-poetry.org/) for dependency management
 
 
 Create an ".env" file in the project root based on ".env.example", and similarly create an ".env.params" file based on ".env.params.example".
+For a detailed walkthrough of required variables and examples, see
+`calculate-dora-lead-time-metric.md`.
 
 ## Usage
 
@@ -90,7 +92,8 @@ poetry run python -m dora_lead_time.main --reports
 
 ## Docker Compose Usage
 
-You can also use Docker Compose for easier management of the Local RAG container:
+You can also use Docker Compose for easier management of the
+`dora-lead-time` container:
 
 1. Clone the project, as described above.
 

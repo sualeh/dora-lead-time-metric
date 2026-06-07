@@ -15,6 +15,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT = 30  # Timeout in seconds for HTTP requests
+PROGRESS_LOG_INTERVAL = 25
 
 
 class GitHubRequests:
@@ -114,7 +115,10 @@ class GitHubRequests:
                     "No GitHub token found for organization: %s", owner
                 )
                 pr_failed += 1
-                if prs_attempted % 25 == 0 or prs_attempted == total_prs:
+                if (
+                    prs_attempted % PROGRESS_LOG_INTERVAL == 0
+                    or prs_attempted == total_prs
+                ):
                     logger.info(
                         "Attempted %d/%d PRs; %d successful, %d failed",
                         prs_attempted,
@@ -141,7 +145,10 @@ class GitHubRequests:
                     owner, repo, pr_number, response.status_code
                 )
                 pr_failed += 1
-                if prs_attempted % 25 == 0 or prs_attempted == total_prs:
+                if (
+                    prs_attempted % PROGRESS_LOG_INTERVAL == 0
+                    or prs_attempted == total_prs
+                ):
                     logger.info(
                         "Attempted %d/%d PRs; %d successful, %d failed",
                         prs_attempted,
@@ -195,13 +202,6 @@ class GitHubRequests:
                 if pr_data["created_at"]
                 else None
             )
-            closed_date = (
-                datetime.fromisoformat(
-                    pr_data["closed_at"].replace("Z", "+00:00")
-                ).date()
-                if pr_data["closed_at"]
-                else None
-            )
 
             # Replace tuple creation with named tuple
             pr_detail = PullRequest(
@@ -220,7 +220,10 @@ class GitHubRequests:
 
             # Log progress
             pr_processed = pr_processed + 1
-            if prs_attempted % 25 == 0 or prs_attempted == total_prs:
+            if (
+                prs_attempted % PROGRESS_LOG_INTERVAL == 0
+                or prs_attempted == total_prs
+            ):
                 logger.info(
                     "Attempted %d/%d PRs; %d successful, %d failed",
                     prs_attempted,

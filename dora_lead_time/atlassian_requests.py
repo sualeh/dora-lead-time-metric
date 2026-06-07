@@ -24,6 +24,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+JIRA_PAGE_SIZE = 25
+PROGRESS_LOG_INTERVAL = 25
+
 
 class ConfigurationError(Exception):
     """Raised when required application configuration is missing."""
@@ -270,7 +273,7 @@ class AtlassianRequests:
 
         # Initialize variables for pagination
         issues_processed = 0
-        max_results = 25
+        max_results = JIRA_PAGE_SIZE
         all_stories = []
         is_last = False
         next_page_token = None
@@ -479,7 +482,7 @@ class AtlassianRequests:
             if not pr_urls:
                 stories_processed_without_prs += 1
             if (
-                stories_attempted % 25 == 0
+                stories_attempted % PROGRESS_LOG_INTERVAL == 0
                 or stories_attempted == total_stories
             ):
                 logger.info(
