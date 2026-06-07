@@ -109,6 +109,7 @@ class AtlassianRequests:
             RateLimitError: If rate limit is exceeded (HTTP 429).
             ApiError: If Jira returns an unrecoverable 4xx/5xx response.
             requests.RequestException: If there's an error connecting to Jira
+        """
 
         headers = {
             "Accept": "application/json",
@@ -159,10 +160,12 @@ class AtlassianRequests:
             List[Release]: List of Release named tuples
 
         Raises:
-            ConfigurationError: If projects is missing or has no software projects.
+            ConfigurationError: If projects is missing or has no
+                software projects.
             AuthError: If authentication fails (HTTP 401/403).
             RateLimitError: If rate limit is exceeded (HTTP 429).
             requests.RequestException: If there's an error connecting to Jira
+        """
 
         headers = {
             "Accept": "application/json",
