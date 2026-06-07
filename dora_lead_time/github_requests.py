@@ -50,6 +50,30 @@ class GitHubRequests:
                     env_var_name
                 )
 
+        self._verify_authentication()
+
+    def _verify_authentication(self) -> None:
+        """Verify each configured GitHub token and log identity details."""
+        if not self.github_token_map:
+            return
+
+        for org, github_token in self.github_token_map.items():
+            headers = {"Authorization": f"token {github_token}"}
+            user_response = api_get(
+                "https://api.github.com/user",
+                ApiSource.GITHUB,
+                headers,
+                timeout=self.request_timeout,
+            )
+            user_info = user_response.json()
+            logger.info(
+                "Authenticated GitHub user for %s: %s (name=%s, url=%s)",
+                org,
+                user_info.get("login"),
+                user_info.get("name"),
+                user_info.get("html_url") or user_info.get("url"),
+            )
+
     def get_pull_request_details(
         self, pull_requests: list[PullRequestIdentifier]
     ) -> list[PullRequest]:
