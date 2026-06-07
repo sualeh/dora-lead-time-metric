@@ -7,8 +7,12 @@ import json
 from datetime import date, datetime
 from unittest.mock import patch, MagicMock
 
-from dora_lead_time.atlassian_requests import AtlassianRequests
+from dora_lead_time.atlassian_requests import (
+    AtlassianRequests,
+    ConfigurationError,
+)
 from dora_lead_time.api_client import ApiError, AuthError, RateLimitError
+from dora_lead_time.database_processor import DatabaseOperationError
 from dora_lead_time.models import Project, Release, PullRequestIdentifier
 
 
@@ -42,15 +46,19 @@ def atlassian_client():
             "ATLASSIAN_TOKEN": "test-token",
         },
     ):
-        return AtlassianRequests()
+        with patch("requests.get") as mock_get:
+            mock_get.return_value = MockResponse({"accountId": "12345"})
+            return AtlassianRequests()
 
 
 def test_init_with_params():
     """Test initialization with explicit parameters."""
-    client = AtlassianRequests(
-        jira_instance="custom.atlassian.net",
-        email="custom@example.com"
-    )
+    with patch("requests.get") as mock_get:
+        mock_get.return_value = MockResponse({"accountId": "12345"})
+        client = AtlassianRequests(
+            jira_instance="custom.atlassian.net",
+            email="custom@example.com"
+        )
     assert client.jira_instance == "custom.atlassian.net"
     assert client.email == "custom@example.com"
     assert client.token == "test-token"
@@ -66,7 +74,9 @@ def test_init_with_env_vars():
             "ATLASSIAN_TOKEN": "env-token",
         },
     ):
-        client = AtlassianRequests()
+        with patch("requests.get") as mock_get:
+            mock_get.return_value = MockResponse({"accountId": "12345"})
+            client = AtlassianRequests()
         assert client.jira_instance == "env.atlassian.net"
         assert client.email == "env@example.com"
         assert client.token == "env-token"
@@ -74,19 +84,11 @@ def test_init_with_env_vars():
 
 def test_init_missing_credentials():
     """Test initialization with missing credentials."""
-    with patch.dict(os.environ, {}, clear=True):
-        try:
-            client = AtlassianRequests()
-            # If we reach here, no exception was raised, so we should check that default values were used
-            assert client.jira_instance is not None, "Expected default jira_instance"
-            assert client.email is not None, "Expected default email"
-            assert client.token is not None, "Expected default token"
-        except Exception as e:
-            # If an exception is raised, verify it's related to missing credentials
-            assert any(
-                credential in str(e).lower()
-                for credential in ["credentials", "jira", "email", "token"]
-            ), f"Exception should mention missing credentials: {str(e)}"
+    with patch.dict(os.environ, {}, clear=True), patch(
+        "dora_lead_time.atlassian_requests.load_dotenv"
+    ):
+        with pytest.raises(ConfigurationError):
+            AtlassianRequests()
 
 
 @patch("requests.get")
@@ -139,12 +141,46 @@ def test_get_projects(mock_get, atlassian_client):
 
 
 @patch("requests.get")
+def test_get_projects_raises_auth_error_when_zero_projects_and_unauthorized(
+    mock_get, atlassian_client
+):
+    """Fail fast when Jira projects endpoint returns 401/403."""
+
+    mock_get.return_value = MockResponse({}, status_code=401)
+
+    with pytest.raises(AuthError, match="Authentication failed"):
+        atlassian_client.get_projects()
+
+
+@patch("requests.get")
+def test_get_projects_empty_raises_configuration_error(
+    mock_get, atlassian_client
+):
+    """No visible software projects should be a configuration error."""
+    mock_get.return_value = MockResponse([])
+
+    with pytest.raises(ConfigurationError, match="no visible software"):
+        atlassian_client.get_projects()
+
+
+@patch("requests.get")
 def test_get_releases(mock_get, atlassian_client):
     """Test getting releases from Jira."""
-    # Mock project response
-    mock_projects = [
-        {"id": "10000", "key": "TEST", "projectTypeKey": "software"},
-        {"id": "10001", "key": "DEV", "projectTypeKey": "software"},
+    projects = [
+        Project(
+            id=None,
+            project_internal_id="10000",
+            project_key="TEST",
+            project_title="Test",
+            project_type="software",
+        ),
+        Project(
+            id=None,
+            project_internal_id="10001",
+            project_key="DEV",
+            project_title="Dev",
+            project_type="software",
+        ),
     ]
 
     # Mock versions response for TEST project
@@ -193,11 +229,9 @@ def test_get_releases(mock_get, atlassian_client):
     # Configure mock to return different responses based on URL
     def side_effect(*args, **kwargs):
         url = args[0]
-        if url == "https://test.atlassian.net/rest/api/3/project":
-            return MockResponse(mock_projects)
-        elif url == "https://test.atlassian.net/rest/api/3/project/TEST/versions":
+        if url == "https://test.atlassian.net/rest/api/3/project/TEST/versions":
             return MockResponse(mock_test_versions)
-        elif url == "https://test.atlassian.net/rest/api/3/project/DEV/versions":
+        if url == "https://test.atlassian.net/rest/api/3/project/DEV/versions":
             return MockResponse(mock_dev_versions)
         return MockResponse({}, 404)
 
@@ -206,7 +240,11 @@ def test_get_releases(mock_get, atlassian_client):
     # Call the method with date range that includes some but not all releases
     start_date = date(2023, 6, 1)
     end_date = date(2023, 7, 31)
-    releases = atlassian_client.get_releases(start_date, end_date)
+    releases = atlassian_client.get_releases(
+        start_date,
+        end_date,
+        projects=projects,
+    )
 
     # Assertions
     assert len(releases) == 3  # Should include 3 releases in the date range
@@ -220,6 +258,92 @@ def test_get_releases(mock_get, atlassian_client):
     # These should be excluded
     assert "10002" not in release_ids  # Unreleased
     assert "20000" not in release_ids  # Outside date range
+
+
+@patch("requests.get")
+def test_get_releases_uses_prefetched_projects(mock_get, atlassian_client):
+    """Use provided projects and skip additional Jira project lookup."""
+    projects = [
+        Project(
+            id=None,
+            project_internal_id="10000",
+            project_key="TEST",
+            project_title="Test Project",
+            project_type="software",
+        )
+    ]
+    mock_versions = [
+        {
+            "id": "10000",
+            "name": "1.0.0",
+            "description": "First release",
+            "releaseDate": "2023-06-15T00:00:00Z",
+            "released": True,
+        },
+    ]
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if url == "https://test.atlassian.net/rest/api/3/project/TEST/versions":
+            return MockResponse(mock_versions)
+        return MockResponse({}, 404)
+
+    mock_get.side_effect = side_effect
+
+    releases = atlassian_client.get_releases(
+        date(2023, 6, 1),
+        date(2023, 7, 31),
+        projects=projects,
+    )
+
+    assert len(releases) == 1
+    requested_urls = [call.args[0] for call in mock_get.call_args_list]
+    assert "https://test.atlassian.net/rest/api/3/project" not in requested_urls
+
+
+def test_get_releases_empty_prefetched_projects_raises_database_error(
+    atlassian_client,
+):
+    """Empty provided project list should fail as a database error."""
+    with pytest.raises(DatabaseOperationError, match="No software projects"):
+        atlassian_client.get_releases(
+            date(2023, 6, 1),
+            date(2023, 7, 31),
+            projects=[],
+        )
+
+
+def test_get_releases_non_software_prefetched_projects_raises_database_error(
+    atlassian_client,
+):
+    """Provided projects with no software type should fail."""
+    projects = [
+        Project(
+            id=None,
+            project_internal_id="10002",
+            project_key="HELP",
+            project_title="Help Desk",
+            project_type="service_desk",
+        )
+    ]
+
+    with pytest.raises(DatabaseOperationError, match="No software projects"):
+        atlassian_client.get_releases(
+            date(2023, 6, 1),
+            date(2023, 7, 31),
+            projects=projects,
+        )
+
+
+@patch("requests.get")
+def test_get_releases_fetched_non_software_projects_raises_database_error(
+    mock_get, atlassian_client
+):
+    """Missing projects input should fail for projects-only contract."""
+    mock_get.return_value = MockResponse({})
+
+    with pytest.raises(DatabaseOperationError, match="Projects are required"):
+        atlassian_client.get_releases(date(2023, 6, 1), date(2023, 7, 31))
 
 
 @patch("requests.get")
@@ -338,10 +462,12 @@ def test_get_story_pull_requests_error_handling(mock_get, atlassian_client):
 
 def test_get_stories_validation():
     """Test input validation for get_stories method."""
-    client = AtlassianRequests(
-        jira_instance="test.atlassian.net",
-        email="test@example.com"
-    )
+    with patch("requests.get") as mock_get:
+        mock_get.return_value = MockResponse({"accountId": "12345"})
+        client = AtlassianRequests(
+            jira_instance="test.atlassian.net",
+            email="test@example.com"
+        )
 
     # Test with non-list input
     with pytest.raises(TypeError):
@@ -373,13 +499,23 @@ def test_get_projects_auth_error(mock_get, status_code, atlassian_client):
 @pytest.mark.parametrize("status_code", [401, 403])
 @patch("requests.get")
 def test_get_releases_auth_error(mock_get, status_code, atlassian_client):
-    """Test that 401/403 on the projects list in get_releases raises AuthError."""
+    """Test that 401/403 on versions request in get_releases raises AuthError."""
     mock_get.return_value = MockResponse({}, status_code)
+    projects = [
+        Project(
+            id=None,
+            project_internal_id="10000",
+            project_key="TEST",
+            project_title="Test",
+            project_type="software",
+        )
+    ]
 
     with pytest.raises(AuthError):
         atlassian_client.get_releases(
             start_date=__import__("datetime").date(2023, 1, 1),
             end_date=__import__("datetime").date(2023, 12, 31),
+            projects=projects,
         )
 
 
@@ -389,22 +525,22 @@ def test_get_releases_versions_auth_error(
     mock_get, status_code, atlassian_client
 ):
     """Test that 401/403 on per-project versions in get_releases raises AuthError."""
-    mock_projects = [
-        {"id": "10000", "key": "TEST", "projectTypeKey": "software"},
+    projects = [
+        Project(
+            id=None,
+            project_internal_id="10000",
+            project_key="TEST",
+            project_title="Test",
+            project_type="software",
+        )
     ]
-
-    def side_effect(*args, **kwargs):
-        url = args[0]
-        if url.endswith("/project"):
-            return MockResponse(mock_projects)
-        return MockResponse({}, status_code)
-
-    mock_get.side_effect = side_effect
+    mock_get.return_value = MockResponse({}, status_code)
 
     with pytest.raises(AuthError):
         atlassian_client.get_releases(
             start_date=__import__("datetime").date(2023, 1, 1),
             end_date=__import__("datetime").date(2023, 12, 31),
+            projects=projects,
         )
 
 
@@ -511,13 +647,23 @@ def test_get_projects_api_error(mock_get, status_code, atlassian_client):
 def test_get_releases_structural_api_error(
     mock_get, status_code, atlassian_client
 ):
-    """Test that 4xx/5xx on the projects list in get_releases raises ApiError."""
+    """Test that 4xx/5xx on versions request is skipped, not raised."""
     mock_get.return_value = MockResponse({}, status_code)
-    with pytest.raises(ApiError):
-        atlassian_client.get_releases(
-            start_date=__import__("datetime").date(2023, 1, 1),
-            end_date=__import__("datetime").date(2023, 12, 31),
+    projects = [
+        Project(
+            id=None,
+            project_internal_id="10000",
+            project_key="TEST",
+            project_title="Test",
+            project_type="software",
         )
+    ]
+    releases = atlassian_client.get_releases(
+        start_date=__import__("datetime").date(2023, 1, 1),
+        end_date=__import__("datetime").date(2023, 12, 31),
+        projects=projects,
+    )
+    assert releases == []
 
 
 @pytest.mark.parametrize("status_code", [404, 500, 503])
@@ -532,21 +678,21 @@ def test_get_stories_api_error(mock_get, status_code, atlassian_client):
 @patch("requests.get")
 def test_get_releases_versions_non_200_skips(mock_get, atlassian_client):
     """Test that per-project versions errors are skipped, not raised."""
-    mock_projects = [
-        {"id": "10000", "key": "TEST", "projectTypeKey": "software"},
+    projects = [
+        Project(
+            id=None,
+            project_internal_id="10000",
+            project_key="TEST",
+            project_title="Test",
+            project_type="software",
+        )
     ]
-
-    def side_effect(*args, **kwargs):
-        url = args[0]
-        if url.endswith("/project"):
-            return MockResponse(mock_projects)
-        return MockResponse({}, 404)
-
-    mock_get.side_effect = side_effect
+    mock_get.return_value = MockResponse({}, 404)
 
     # Should return empty list, not raise
     releases = atlassian_client.get_releases(
         start_date=__import__("datetime").date(2023, 1, 1),
         end_date=__import__("datetime").date(2023, 12, 31),
+        projects=projects,
     )
     assert releases == []

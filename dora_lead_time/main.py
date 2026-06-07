@@ -9,8 +9,14 @@ from datetime import date, datetime
 import pathlib
 from typing import NamedTuple
 from dotenv import load_dotenv
-from dora_lead_time.database_processor import DatabaseProcessor, DatabaseOperationError
-from dora_lead_time.atlassian_requests import AtlassianRequests
+from dora_lead_time.database_processor import (
+    DatabaseOperationError,
+    DatabaseProcessor,
+)
+from dora_lead_time.atlassian_requests import (
+    AtlassianRequests,
+    ConfigurationError,
+)
 from dora_lead_time.api_client import ApiError, AuthError, RateLimitError
 from dora_lead_time.github_requests import GitHubRequests
 from dora_lead_time.outlier_reports import OutlierReports
@@ -127,7 +133,8 @@ def create_releases_database(config: LeadTimeConfiguration):
     )
     releases = atlassian_client.get_releases(
         config.start_date,
-        config.end_date
+        config.end_date,
+        projects=projects,
     )
     db_processor.save_releases(releases)
 
@@ -423,6 +430,9 @@ def main():
     if build_database:
         try:
             create_releases_database(config)
+        except ConfigurationError as e:
+            logger.error("Configuration error while building database: %s", e)
+            sys.exit(1)
         except (ApiError, AuthError, RateLimitError) as e:
             logger.error("API error while building database: %s", e)
             sys.exit(1)
