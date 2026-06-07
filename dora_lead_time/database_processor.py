@@ -3,8 +3,8 @@
 import logging
 import os
 import pathlib
-from datetime import date, datetime
 import sqlite3
+from datetime import date, datetime
 from dora_lead_time.models import PullRequestIdentifier, Project
 
 logging.basicConfig(
@@ -12,6 +12,52 @@ logging.basicConfig(
     format="%(asctime)s `%(funcName)s` %(levelname)s:\n  %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+PULL_REQUEST_BATCH_SIZE = 100
+
+
+def make_sqlite_connection(
+    sqlite_path: str,
+    check_exists: bool = True,
+) -> sqlite3.Connection:
+    """Create a SQLite connection with configured date/time conversion.
+
+    Args:
+        sqlite_path (str): Path to SQLite database file.
+        check_exists (bool, optional): When True, ensure the database file
+            exists before connecting. Defaults to True.
+
+    Returns:
+        sqlite3.Connection: A configured SQLite connection.
+
+    Raises:
+        FileNotFoundError: If the database file does not exist and
+            ``check_exists`` is True.
+    """
+    if check_exists and not os.path.exists(sqlite_path):
+        raise FileNotFoundError(
+            f"Database file does not exist: {sqlite_path}"
+        )
+
+    sqlite3.register_adapter(date, lambda val: val.isoformat())
+    sqlite3.register_adapter(datetime, lambda val: val.isoformat())
+
+    sqlite3.register_converter(
+        "date",
+        lambda val: date.fromisoformat(val.decode())
+    )
+    sqlite3.register_converter(
+        "timestamp",
+        lambda val: datetime.fromisoformat(val.decode())
+    )
+
+    conn = sqlite3.connect(
+        sqlite_path,
+        detect_types=sqlite3.PARSE_DECLTYPES,
+    )
+    logger.debug("Connected to %s", sqlite_path)
+
+    return conn
 
 
 class DatabaseOperationError(Exception):
@@ -45,32 +91,10 @@ class DatabaseProcessor:
             FileNotFoundError: If the database file does not exist
                 and check_exists is True
         """
-        sqlite_path = self.sqlite_path
-
-        if check_exists and not os.path.exists(sqlite_path):
-            raise FileNotFoundError(
-                f"Database file does not exist: {sqlite_path}"
-            )
-
-        # Register adapters for Python objects to SQLite types
-        sqlite3.register_adapter(date, lambda val: val.isoformat())
-        sqlite3.register_adapter(datetime, lambda val: val.isoformat())
-
-        # Register converters from SQLite types to Python objects
-        sqlite3.register_converter(
-            "date",
-            lambda val: date.fromisoformat(val.decode())
+        conn = make_sqlite_connection(
+            self.sqlite_path,
+            check_exists=check_exists,
         )
-        sqlite3.register_converter(
-            "timestamp",
-            lambda val: datetime.fromisoformat(val.decode())
-        )
-
-        conn = sqlite3.connect(
-            sqlite_path,
-            detect_types=sqlite3.PARSE_DECLTYPES
-        )
-        logger.debug("Connected to %s", sqlite_path)
 
         return conn
 
@@ -520,7 +544,10 @@ class DatabaseProcessor:
                 FROM
                     stage_stories
                 JOIN releases
-                    ON stage_stories.release_internal_id = releases.release_internal_id
+                    ON (
+                        stage_stories.release_internal_id
+                        = releases.release_internal_id
+                    )
                 """
             )
             logger.info("Inserted %d stories", cursor.rowcount)
@@ -553,10 +580,14 @@ class DatabaseProcessor:
 
     def retrieve_stories_without_pull_requests(
         self,
-        limit: int = 0,
+        limit: int = PULL_REQUEST_BATCH_SIZE,
     ) -> list[str]:
         """Retrieves story keys that don't have associated pull requests for
             given projects and date range.
+
+        Args:
+            limit (int, optional): Maximum number of records to retrieve.
+                Defaults to 0.
 
         Returns:
             List of story keys that don't have pull requests mapped to them
@@ -568,21 +599,22 @@ class DatabaseProcessor:
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
-
-            cursor.execute(
-                """
+            query = f"""
                 SELECT
                     stories.story_key
                 FROM
                     stories
                     LEFT OUTER JOIN stories_pull_request_counts
-                        ON stories.story_key = stories_pull_request_counts.story_key
+                        ON (
+                            stories.story_key
+                            = stories_pull_request_counts.story_key
+                        )
                 WHERE
                     stories_pull_request_counts.story_key IS NULL
-                LIMIT ?
-                """,
-                (limit,),
-            )
+                LIMIT {limit}
+                """
+
+            cursor.execute(query)
 
             story_keys = cursor.fetchall()
             story_keys = [story_key[0] for story_key in story_keys]
@@ -613,7 +645,8 @@ class DatabaseProcessor:
         """Saves GitHub pull request mappings for Jira stories to the database.
 
         Args:
-            stories_pull_requests: Mapping of story keys to pull request URLs
+            stories_pull_requests_map: Mapping of story keys to pull
+                request URLs
 
         Raises:
             Exception: If there's an error saving data to the database
@@ -701,8 +734,8 @@ class DatabaseProcessor:
             cursor.execute(
                 """
                 INSERT OR IGNORE INTO stories_pull_requests(
-                                    story_id,
-                  pr_id
+                                        story_id,
+                                        pr_id
                 )
                 SELECT
                     stories.id,
@@ -710,12 +743,18 @@ class DatabaseProcessor:
                 FROM
                     stage_stories_pull_requests
                     JOIN stories
-                        ON stage_stories_pull_requests.story_key = stories.story_key
+                        ON (
+                            stage_stories_pull_requests.story_key
+                            = stories.story_key
+                        )
                     JOIN pull_requests
                         ON (
-                            stage_stories_pull_requests.pr_owner = pull_requests.pr_owner
-                            AND stage_stories_pull_requests.pr_repository = pull_requests.pr_repository
-                            AND stage_stories_pull_requests.pr_number = pull_requests.pr_number
+                            stage_stories_pull_requests.pr_owner
+                            = pull_requests.pr_owner
+                            AND stage_stories_pull_requests.pr_repository
+                            = pull_requests.pr_repository
+                            AND stage_stories_pull_requests.pr_number
+                            = pull_requests.pr_number
                         )
                 """
             )
@@ -767,9 +806,13 @@ class DatabaseProcessor:
 
     def retrieve_pull_requests_without_details(
         self,
-        limit: int = 0,
+        limit: int = PULL_REQUEST_BATCH_SIZE,
     ) -> list[PullRequestIdentifier]:
         """Gets pull request URLs that have no details from the database.
+
+        Args:
+            limit (int, optional): Maximum number of records to retrieve.
+                Defaults to 0.
 
         Returns:
             list[PullRequestIdentifier]: List of PullRequestIdentifier objects
@@ -781,9 +824,7 @@ class DatabaseProcessor:
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
-
-            cursor.execute(
-                """
+            query = f"""
                 SELECT
                     pull_requests.id,
                     pull_requests.pr_owner,
@@ -793,10 +834,10 @@ class DatabaseProcessor:
                     pull_requests
                 WHERE
                     pull_requests.pr_title IS NULL
-                LIMIT ?
-                """,
-                (limit,),
-            )
+                LIMIT {limit}
+                """
+
+            cursor.execute(query)
 
             rows = cursor.fetchall()
             pull_requests = [

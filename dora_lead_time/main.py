@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from dora_lead_time.database_processor import (
     DatabaseOperationError,
     DatabaseProcessor,
+    PULL_REQUEST_BATCH_SIZE,
 )
 from dora_lead_time.atlassian_requests import (
     AtlassianRequests,
@@ -28,7 +29,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-PULL_REQUEST_BATCH_SIZE = 100
 PROGRESS_CHECKPOINT_INTERVAL = 10
 CHART_IMAGE_DPI = 600
 CHART_IMAGE_FORMAT = "png"
@@ -99,10 +99,8 @@ def create_releases_database(config: LeadTimeConfiguration):
     """Coordinate the creation of the releases database.
 
     Args:
-        build_database (bool): Flag to determine whether to build the database
-        start_date (date): Start date for release search (inclusive)
-        end_date (date): End date for release search (inclusive)
-        org_to_env_var_map (dict[str, str]): Mapping from GitHub org to env var
+        config (LeadTimeConfiguration): Runtime configuration containing
+            sqlite path, date range, build flag, and GitHub token mapping.
     """
     logger.info(
         "Creating releases database between %s and %s",
@@ -290,7 +288,7 @@ def _save_lead_time_chart(
     start_date: date,
     end_date: date,
     title: str,
-    file_path: pathlib.Path = None
+    file_path: pathlib.Path
 ):
     """
     Saves a lead time chart as an image file.
@@ -306,9 +304,8 @@ def _save_lead_time_chart(
         start_date (date): The start date for the lead time data.
         end_date (date): The end date for the lead time data.
         title (str): The title of the chart.
-        file_path (pathlib.Path, optional): The file path where the chart
-            will be saved.
-            If not provided, a default path should be specified by the caller.
+        file_path (pathlib.Path): The file path where the chart will be
+            saved.
 
     Raises:
         ValueError: If any of the input parameters are invalid.

@@ -2,10 +2,10 @@
 
 import logging
 import os
-from datetime import date, datetime
 import pathlib
 import sqlite3
 import pandas as pd
+from dora_lead_time.database_processor import make_sqlite_connection
 
 logging.basicConfig(
     level=logging.INFO,
@@ -52,27 +52,7 @@ class OutlierReports:
             sqlite3.Connection: A connection to the SQLite database with
             properly configured type handling.
         """
-        sqlite_path = self.sqlite_path
-
-        # Register adapters for Python objects to SQLite types
-        sqlite3.register_adapter(date, lambda val: val.isoformat())
-        sqlite3.register_adapter(datetime, lambda val: val.isoformat())
-
-        # Register converters from SQLite types to Python objects
-        sqlite3.register_converter(
-            "date",
-            lambda val: date.fromisoformat(val.decode())
-        )
-        sqlite3.register_converter(
-            "timestamp",
-            lambda val: datetime.fromisoformat(val.decode())
-        )
-
-        conn = sqlite3.connect(
-            sqlite_path,
-            detect_types=sqlite3.PARSE_DECLTYPES
-        )
-        logger.debug("Connected to %s", sqlite_path)
+        conn = make_sqlite_connection(self.sqlite_path)
 
         return conn
 

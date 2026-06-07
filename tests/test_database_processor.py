@@ -4,7 +4,11 @@ import os
 import pytest
 import sqlite3
 from datetime import date, datetime
-from dora_lead_time.database_processor import DatabaseProcessor, DatabaseOperationError
+from dora_lead_time.database_processor import (
+    DatabaseOperationError,
+    DatabaseProcessor,
+    PULL_REQUEST_BATCH_SIZE,
+)
 from dora_lead_time.models import Project, PullRequestIdentifier, PullRequest
 
 
@@ -220,3 +224,63 @@ def test_save_releases_raises_on_missing_schema(db_processor):
     releases = [(None, "REL-1", "Release 1", "desc", "2024-01-01", "PROJ1")]
     with pytest.raises(DatabaseOperationError):
         db_processor.save_releases(releases)
+
+
+def test_retrieve_stories_without_pull_requests_uses_default_limit(
+    db_processor,
+):
+    """Test default limit for story keys without pull requests."""
+    db_processor.create_schema()
+
+    conn = sqlite3.connect(db_processor.sqlite_path)
+    cursor = conn.cursor()
+    stories = [
+        (f"STORY-{idx}", f"Title {idx}")
+        for idx in range(PULL_REQUEST_BATCH_SIZE + 10)
+    ]
+    cursor.executemany(
+        """
+        INSERT INTO stories (story_key, story_title)
+        VALUES (?, ?)
+        """,
+        stories,
+    )
+    conn.commit()
+    conn.close()
+
+    story_keys = db_processor.retrieve_stories_without_pull_requests()
+
+    assert len(story_keys) == PULL_REQUEST_BATCH_SIZE
+
+
+def test_retrieve_pull_requests_without_details_honors_explicit_limit(
+    db_processor,
+):
+    """Test explicit limit for pull requests without details."""
+    db_processor.create_schema()
+
+    conn = sqlite3.connect(db_processor.sqlite_path)
+    cursor = conn.cursor()
+    pull_requests = [
+        (f"owner-{idx}", f"repo-{idx}", str(idx))
+        for idx in range(5)
+    ]
+    cursor.executemany(
+        """
+        INSERT INTO pull_requests (pr_owner, pr_repository, pr_number)
+        VALUES (?, ?, ?)
+        """,
+        pull_requests,
+    )
+    conn.commit()
+    conn.close()
+
+    pending_pull_requests = db_processor.retrieve_pull_requests_without_details(
+        limit=2,
+    )
+
+    assert len(pending_pull_requests) == 2
+    assert all(
+        isinstance(pull_request, PullRequestIdentifier)
+        for pull_request in pending_pull_requests
+    )
