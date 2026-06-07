@@ -124,6 +124,7 @@ def create_releases_database(config: LeadTimeConfiguration):
     logger.info("-- 2. Getting projects from Atlassian Jira")
     projects = atlassian_client.get_projects()
     db_processor.save_projects(projects)
+    db_processor.print_summary()
 
     # Step 3: Get and save releases
     logger.info(
@@ -137,6 +138,7 @@ def create_releases_database(config: LeadTimeConfiguration):
         projects=projects,
     )
     db_processor.save_releases(releases)
+    db_processor.print_summary()
 
     # Step 4: Find releases without stories, get stories and save them
     logger.info("-- 4. Getting stories for releases from Atlassian Jira")
@@ -146,6 +148,7 @@ def create_releases_database(config: LeadTimeConfiguration):
         logger.info("Getting stories for %d releases", len(release_ids))
         stories = atlassian_client.get_stories(release_ids)
         db_processor.save_stories(stories)
+    db_processor.print_summary()
 
     # Step 5: Find stories without pull requests, get PRs and save them
     logger.info("-- 5. Getting pull requests for stories from Atlassian Jira")
@@ -165,6 +168,7 @@ def create_releases_database(config: LeadTimeConfiguration):
             db_processor.save_story_pull_requests(story_pull_requests)
         else:
             break
+    db_processor.print_summary()
 
     # Step 6: Find pull requests without details, get details and save them
     logger.info("-- 6. Getting details for pull requests from GitHub")
@@ -182,6 +186,7 @@ def create_releases_database(config: LeadTimeConfiguration):
             db_processor.save_pull_request_details(pr_details)
         else:
             break
+    db_processor.print_summary()
 
     logger.info("-- 7. Release database creation completed successfully")
     db_processor.print_summary()
