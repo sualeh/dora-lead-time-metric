@@ -70,19 +70,33 @@ class AtlassianRequests:
         self.email = cast(str, email_value)
         self.token = cast(str, token_value)
 
+        self._verify_authentication()
+
+    def _verify_authentication(self) -> dict:
+        """Verify Jira credentials and log the authenticated identity."""
+
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
         }
         auth = (self.email, self.token)
         myself_url = f"https://{self.jira_instance}/rest/api/3/myself"
-        api_get(
+        response = api_get(
             myself_url,
             ApiSource.ATLASSIAN,
             headers,
             auth=auth,
             timeout=self.request_timeout,
         )
+
+        user_info = response.json()
+        logger.info(
+            "Authenticated Jira user: %s (accountId=%s, self=%s)",
+            user_info.get("displayName"),
+            user_info.get("accountId"),
+            user_info.get("self"),
+        )
+        return user_info
 
     def get_projects(self) -> List[Project]:
         """Get all projects from Jira.
