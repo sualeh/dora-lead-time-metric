@@ -104,9 +104,11 @@ class AtlassianRequests:
                 (project_internal_id, project_key, project_title, project_type)
 
         Raises:
-            ConfigurationError: If Jira returns no projects
+            ConfigurationError: If Jira returns no visible software projects.
+            AuthError: If authentication fails (HTTP 401/403).
+            RateLimitError: If rate limit is exceeded (HTTP 429).
+            ApiError: If Jira returns an unrecoverable 4xx/5xx response.
             requests.RequestException: If there's an error connecting to Jira
-        """
 
         headers = {
             "Accept": "application/json",
