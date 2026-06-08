@@ -444,18 +444,16 @@ class AtlassianRequests:
         if not story_numbers:
             raise ValueError("story_numbers list cannot be empty")
 
-        normalized_stories = []
         for story in story_numbers:
             if not isinstance(story, tuple) or len(story) != 2:
                 raise TypeError(
                     "story entries must be (story_key, jira_issue_id) "
                     "tuples"
                 )
-            normalized_stories.append(story)
 
         invalid_story_keys = [
             story_key
-            for story_key, _ in normalized_stories
+            for story_key, _ in story_numbers
             if not isinstance(story_key, str) or not story_key.strip()
         ]
         if invalid_story_keys:
@@ -467,13 +465,13 @@ class AtlassianRequests:
         }
         auth = (self.email, self.token)
 
-        total_stories = len(normalized_stories)
+        total_stories = len(story_numbers)
         stories_attempted = 0
         stories_processed = 0
         stories_processed_without_prs = 0
         failed_story_requests = 0
         story_to_pr_urls = {}
-        for story, issue_id in normalized_stories:
+        for story, issue_id in story_numbers:
             stories_attempted += 1
 
             if issue_id is None:
