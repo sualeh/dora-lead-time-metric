@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Build database: Dora Lead Time",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "dora_lead_time.main",
+      "args": ["--build"],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ]
+}
