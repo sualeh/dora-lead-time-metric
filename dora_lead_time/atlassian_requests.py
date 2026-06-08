@@ -4,6 +4,7 @@ import logging
 import os
 import textwrap
 from datetime import date, datetime
+from urllib.parse import urlparse
 from typing import Dict, List, cast
 from dotenv import load_dotenv
 
@@ -98,6 +99,60 @@ class AtlassianRequests:
             user_info.get("self"),
         )
         return user_info
+
+    def _build_dev_detail_query_variants(
+        self,
+        issue_id: str,
+    ) -> list[str]:
+        """Build ordered detail query variants for GitHub integrations."""
+
+        query_variants = [
+            (
+                f"issueId={issue_id}&applicationType=GitHub"
+                "&dataType=pullrequest"
+            ),
+            (
+                "issueId="
+                f"{issue_id}&applicationType="
+                "oAuth-com.github.integration.production"
+                "&dataType=pullrequest"
+            ),
+            (
+                f"issueId={issue_id}&applicationType=GitHub"
+                "&applicationId=oAuth-com.github.integration.production"
+                "&dataType=pullrequest"
+            ),
+        ]
+
+        return list(dict.fromkeys(query_variants))
+
+    def _to_pull_request_identifier(
+        self, pr_url: str
+    ) -> PullRequestIdentifier | None:
+        """Convert a GitHub PR URL to PullRequestIdentifier."""
+
+        parsed = urlparse(pr_url)
+        path_parts = [part for part in parsed.path.split("/") if part]
+        if len(path_parts) < 4 or path_parts[2] != "pull":
+            logger.warning("Skipping unsupported pull request URL: %s", pr_url)
+            return None
+
+        owner = path_parts[0]
+        repo = path_parts[1]
+        pr_number = path_parts[3]
+        if not pr_number.isdigit():
+            logger.warning(
+                "Skipping pull request URL with invalid id: %s",
+                pr_url,
+            )
+            return None
+
+        return PullRequestIdentifier(
+            id=None,
+            pr_owner=owner,
+            pr_repository=repo,
+            pr_number=pr_number,
+        )
 
     def get_projects(self) -> List[Project]:
         """Get all projects from Jira.
@@ -429,32 +484,59 @@ class AtlassianRequests:
             issue_data = issue_response.json()
             issue_id = issue_data["id"]
 
-            # Then get development information using the issue id
-            dev_url = (
-                "https://"
-                f"{self.jira_instance}/rest/dev-status/latest/issue/detail"
-                f"?issueId={issue_id}"
-                f"&applicationType=GitHub"
-                f"&dataType=pullrequest"
-            )
-            dev_response = api_get(
-                dev_url, ApiSource.ATLASSIAN, headers,
-                auth=auth, timeout=self.request_timeout,
-                raise_on_error=False,
+            # Then get development information using the issue id.
+            # Jira Cloud tenants can require different combinations here.
+            query_variants = self._build_dev_detail_query_variants(
+                issue_id=issue_id,
             )
 
-            if dev_response.status_code != 200:
+            dev_data = {"detail": []}
+            detail_found = False
+            last_status_code = None
+            last_response_text = ""
+            for query in query_variants:
+                dev_url = (
+                    "https://"
+                    f"{self.jira_instance}/rest/dev-status/latest/issue/"
+                    f"detail?{query}"
+                )
+                dev_response = api_get(
+                    dev_url,
+                    ApiSource.ATLASSIAN,
+                    headers,
+                    auth=auth,
+                    timeout=self.request_timeout,
+                    raise_on_error=False,
+                )
+
+                last_status_code = dev_response.status_code
+                last_response_text = dev_response.text
+                if dev_response.status_code != 200:
+                    continue
+
+                dev_data = dev_response.json()
+                if dev_data.get("detail"):
+                    detail_found = True
+                    break
+
+            if last_status_code != 200:
                 logger.error(
                     "Error getting development info for %s: %s - %s",
                     story,
-                    dev_response.status_code,
-                    dev_response.text,
+                    last_status_code,
+                    last_response_text,
                 )
                 failed_story_requests += 1
                 story_to_pr_urls[story] = []
                 continue
 
-            dev_data = dev_response.json()
+            if not detail_found:
+                logger.info(
+                    "No pull request detail returned for %s (issueId=%s)",
+                    story,
+                    issue_id,
+                )
+
             pr_urls = []
 
             # Extract PR URLs from development data
@@ -462,18 +544,11 @@ class AtlassianRequests:
             for repository in detail:
                 for pr in repository.get("pullRequests", []):
                     if "url" in pr:
-                        # Parse URL to get owner, repo, and PR number
-                        parts = pr["url"].split("/")
-                        owner = parts[3]
-                        repo = parts[4]
-                        pr_number = str(int(parts[6]))
-                        pull_request = PullRequestIdentifier(
-                            id=None,
-                            pr_owner=owner,
-                            pr_repository=repo,
-                            pr_number=pr_number
+                        pull_request = self._to_pull_request_identifier(
+                            pr["url"]
                         )
-                        pr_urls.append(pull_request)
+                        if pull_request is not None:
+                            pr_urls.append(pull_request)
 
             story_to_pr_urls[story] = pr_urls
 
