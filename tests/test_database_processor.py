@@ -64,7 +64,7 @@ def test_create_schema(db_processor):
 
     cursor.execute("PRAGMA table_info(stories);")
     story_columns = {row[1]: row[2].upper() for row in cursor.fetchall()}
-    assert story_columns["jira_issue_id"] == "VARCHAR(1024)"
+    assert story_columns["story_issue_id"] == "VARCHAR(1024)"
     assert story_columns["story_created"] == "DATETIME"
     assert story_columns["story_resolved"] == "DATETIME"
 
@@ -278,8 +278,8 @@ def test_retrieve_stories_without_pull_requests_uses_default_limit(
     assert all(len(row) == 2 for row in story_rows)
 
 
-def test_save_stories_persists_jira_issue_id(db_processor):
-    """Stories should persist jira_issue_id during save."""
+def test_save_stories_persists_story_issue_id(db_processor):
+    """Stories should persist story_issue_id during save."""
     db_processor.create_schema()
 
     conn = sqlite3.connect(db_processor.sqlite_path)
@@ -315,7 +315,7 @@ def test_save_stories_persists_jira_issue_id(db_processor):
     stories = [
         Story(
             id=None,
-            jira_issue_id="730307",
+            story_issue_id="730307",
             story_key="TEST-1",
             story_title="First Story",
             story_type="Story",
@@ -330,7 +330,7 @@ def test_save_stories_persists_jira_issue_id(db_processor):
     cursor = conn.cursor()
     cursor.execute(
         """
-        SELECT jira_issue_id, story_key
+        SELECT story_issue_id, story_key
         FROM stories
         """
     )

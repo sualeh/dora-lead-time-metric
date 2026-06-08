@@ -376,7 +376,7 @@ class AtlassianRequests:
                     if release["id"] in releases:
                         story_details = Story(
                             id=None,
-                            jira_issue_id=issue["id"],
+                            story_issue_id=issue["id"],
                             story_key=issue["key"],
                             story_title=issue["fields"]["summary"],
                             story_type=issue["fields"]["issuetype"]["name"],
@@ -425,7 +425,7 @@ class AtlassianRequests:
 
         Args:
             story_numbers: List of story records as tuples
-                (story_key, jira_issue_id), e.g.
+                (story_key, story_issue_id), e.g.
                 [('SRTN-864', '12345'), ('SRTN-865', '12346')]
 
         Returns:
@@ -447,7 +447,7 @@ class AtlassianRequests:
         for story in story_numbers:
             if not isinstance(story, tuple) or len(story) != 2:
                 raise TypeError(
-                    "story entries must be (story_key, jira_issue_id) "
+                    "story entries must be (story_key, story_issue_id) "
                     "tuples"
                 )
 
@@ -476,7 +476,7 @@ class AtlassianRequests:
 
             if issue_id is None:
                 logger.error(
-                    "Missing jira_issue_id for story %s; skipping",
+                    "Missing story_issue_id for story %s; skipping",
                     story,
                 )
                 failed_story_requests += 1

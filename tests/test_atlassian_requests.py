@@ -395,7 +395,7 @@ def test_get_stories(mock_get, atlassian_client):
     story_keys = [s.story_key for s in stories]
     assert story_keys.count("TEST-1") == 2  # In both releases
     assert story_keys.count("TEST-2") == 1  # In one release
-    story_issue_ids = {s.story_key: s.jira_issue_id for s in stories}
+    story_issue_ids = {s.story_key: s.story_issue_id for s in stories}
     assert story_issue_ids["TEST-1"] == "55501"
     assert story_issue_ids["TEST-2"] == "55502"
 

@@ -496,7 +496,7 @@ class DatabaseProcessor:
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS stage_stories (
-                    jira_issue_id VARCHAR(1024),
+                    story_issue_id VARCHAR(1024),
                     story_key VARCHAR(1024),
                     story_title VARCHAR(1024),
                     story_type VARCHAR(1024),
@@ -511,7 +511,7 @@ class DatabaseProcessor:
             cursor.executemany(
                 """
                 INSERT INTO stage_stories (
-                    jira_issue_id,
+                    story_issue_id,
                     story_key,
                     story_title,
                     story_type,
@@ -529,7 +529,7 @@ class DatabaseProcessor:
                 """
                 INSERT OR IGNORE INTO stories
                 (
-                    jira_issue_id,
+                    story_issue_id,
                     story_key,
                     story_title,
                     story_type,
@@ -538,7 +538,7 @@ class DatabaseProcessor:
                     release_id
                 )
                 SELECT
-                    stage_stories.jira_issue_id,
+                    stage_stories.story_issue_id,
                     stage_stories.story_key,
                     stage_stories.story_title,
                     stage_stories.story_type,
@@ -594,7 +594,7 @@ class DatabaseProcessor:
                 Defaults to 0.
 
         Returns:
-            List[tuple[str, str | None]]: (story key, Jira issue id)
+            List[tuple[str, str | None]]: (story key, story issue id)
                 pairs that don't have pull requests mapped to them.
 
         Raises:
@@ -607,8 +607,8 @@ class DatabaseProcessor:
             query = f"""
                 SELECT
                     stories.story_key,
-                    MAX(stories.jira_issue_id)
-                        AS jira_issue_id
+                    MAX(stories.story_issue_id)
+                        AS story_issue_id
                 FROM
                     stories
                     LEFT OUTER JOIN stories_pull_request_counts
