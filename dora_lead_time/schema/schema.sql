@@ -69,8 +69,9 @@ CREATE TABLE IF NOT EXISTS stories_pull_request_counts (
 	story_key VARCHAR(1024),
 	pr_count INTEGER,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	UNIQUE(story_key),
-	FOREIGN KEY (story_key) REFERENCES stories (story_key)
+	-- This table uses UNIQUE(story_key), while stories uses
+	-- UNIQUE(story_key, release_id); do not define an FK to stories(story_key).
+	UNIQUE(story_key)
 );
 
 DROP VIEW IF EXISTS lead_times;
