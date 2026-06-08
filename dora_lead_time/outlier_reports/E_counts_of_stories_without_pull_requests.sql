@@ -4,6 +4,8 @@
 WITH project_story_counts AS (
   SELECT
     projects.project_key,
+    projects.project_title,
+    stories.story_type,
     COUNT(DISTINCT stories.id)
       AS total_stories,
     COUNT(DISTINCT
@@ -31,32 +33,35 @@ WITH project_story_counts AS (
   WHERE
     stories.story_resolved >= date('now', '-60 days')
   GROUP BY
-    projects.project_key
+    projects.project_key,
+    projects.project_title,
+    stories.story_type
   HAVING
     COUNT(DISTINCT stories.id) > 0
 )
 SELECT
-  p.project_key,
-  p.project_title,
-  COALESCE(s.stories_without_prs, 0)
+  project_story_counts.project_key,
+  project_story_counts.project_title,
+  project_story_counts.story_type,
+  COALESCE(project_story_counts.stories_without_prs, 0)
       AS stories_without_prs,
-  COALESCE(s.total_stories, 0)
+  COALESCE(project_story_counts.total_stories, 0)
       AS total_stories,
   CASE
-    WHEN COALESCE(s.total_stories, 0) = 0
+    WHEN COALESCE(project_story_counts.total_stories, 0) = 0
       THEN 0.0
       ELSE CAST(
         ROUND(
         (
-          COALESCE(s.stories_without_prs, 0) * 100.0 /
-          COALESCE(s.total_stories, 0)
+          COALESCE(project_story_counts.stories_without_prs, 0) * 100.0 /
+          COALESCE(project_story_counts.total_stories, 0)
         ), 0)
         AS INTEGER)
   END
       AS percentage_stories_without_prs
 FROM
-  projects p
-  JOIN project_story_counts s
-    ON p.project_key = s.project_key
+  project_story_counts
 ORDER BY
-  percentage_stories_without_prs DESC
+  percentage_stories_without_prs DESC,
+  project_story_counts.project_key,
+  project_story_counts.story_type
