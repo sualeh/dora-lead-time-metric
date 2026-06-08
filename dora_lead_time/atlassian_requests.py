@@ -154,56 +154,6 @@ class AtlassianRequests:
             pr_number=pr_number,
         )
 
-    def _get_story_issue_id(
-        self,
-        story_key: str,
-        headers: dict,
-        auth: tuple[str, str],
-    ) -> str | None:
-        """Resolve Jira issue id for a story key."""
-
-        issue_url = (
-            f"https://{self.jira_instance}/rest/api/3/issue/"
-            f"{story_key}?fields=id"
-        )
-        issue_response = api_get(
-            issue_url,
-            ApiSource.ATLASSIAN,
-            headers,
-            auth=auth,
-            timeout=self.request_timeout,
-            raise_on_error=False,
-        )
-
-        if issue_response.status_code != 200:
-            logger.error(
-                "Error getting issue %s: %s - %s",
-                story_key,
-                issue_response.status_code,
-                issue_response.text,
-            )
-            return None
-
-        issue_data = issue_response.json()
-        return issue_data.get("id")
-
-    def _normalize_story_lookup(
-        self,
-        story: str | tuple[str, str | None],
-    ) -> tuple[str, str | None]:
-        """Normalize story input into (story_key, jira_issue_id)."""
-
-        if isinstance(story, str):
-            return story, None
-
-        if isinstance(story, tuple) and len(story) == 2:
-            return story
-
-        raise TypeError(
-            "story entries must be a story key string or "
-            "(story_key, jira_issue_id) tuple"
-        )
-
     def get_projects(self) -> List[Project]:
         """Get all projects from Jira.
 
@@ -464,7 +414,7 @@ class AtlassianRequests:
 
     def get_story_pull_requests(
         self,
-        story_numbers: list[str | tuple[str, str | None]],
+        story_numbers: list[tuple[str, str | None]],
     ) -> Dict[str, List[PullRequestIdentifier]]:
         """
         Retrieves GitHub pull request information associated with given Jira
@@ -474,8 +424,9 @@ class AtlassianRequests:
         requests linked to the specified stories.
 
         Args:
-            story_numbers: List of Jira story identifiers
-                (e.g., ['SRTN-864', 'SRTN-865'])
+            story_numbers: List of story records as tuples
+                (story_key, jira_issue_id), e.g.
+                [('SRTN-864', '12345'), ('SRTN-865', '12346')]
 
         Returns:
             Dict[str, List[PullRequestIdentifier]]: A dictionary mapping
@@ -493,10 +444,14 @@ class AtlassianRequests:
         if not story_numbers:
             raise ValueError("story_numbers list cannot be empty")
 
-        normalized_stories = [
-            self._normalize_story_lookup(story)
-            for story in story_numbers
-        ]
+        normalized_stories = []
+        for story in story_numbers:
+            if not isinstance(story, tuple) or len(story) != 2:
+                raise TypeError(
+                    "story entries must be (story_key, jira_issue_id) "
+                    "tuples"
+                )
+            normalized_stories.append(story)
 
         invalid_story_keys = [
             story_key
@@ -522,11 +477,13 @@ class AtlassianRequests:
             stories_attempted += 1
 
             if issue_id is None:
-                issue_id = self._get_story_issue_id(story, headers, auth)
-                if issue_id is None:
-                    failed_story_requests += 1
-                    story_to_pr_urls[story] = []
-                    continue
+                logger.error(
+                    "Missing jira_issue_id for story %s; skipping",
+                    story,
+                )
+                failed_story_requests += 1
+                story_to_pr_urls[story] = []
+                continue
 
             # Then get development information using the issue id.
             # Jira Cloud tenants can require different combinations here.

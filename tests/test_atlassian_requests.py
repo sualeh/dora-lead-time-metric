@@ -409,8 +409,6 @@ def test_get_stories(mock_get, atlassian_client):
 def test_get_story_pull_requests(mock_get, atlassian_client):
     """Test getting pull requests associated with stories."""
     # Mock responses
-    mock_issue_response = {"id": "12345"}
-
     mock_dev_info_response = {
         "detail": [
             {
@@ -428,16 +426,16 @@ def test_get_story_pull_requests(mock_get, atlassian_client):
     # Configure mock to return different responses
     def side_effect(*args, **kwargs):
         url = args[0]
-        if "rest/api/3/issue/TEST-1" in url:
-            return MockResponse(mock_issue_response)
-        elif "rest/dev-status" in url:
+        if "rest/dev-status" in url:
             return MockResponse(mock_dev_info_response)
         return MockResponse({}, 404)
 
     mock_get.side_effect = side_effect
 
     # Call the method
-    story_prs = atlassian_client.get_story_pull_requests(["TEST-1"])
+    story_prs = atlassian_client.get_story_pull_requests([
+        ("TEST-1", "12345")
+    ])
 
     # Assertions
     assert "TEST-1" in story_prs
@@ -495,7 +493,6 @@ def test_get_story_pull_requests_uses_oauth_variant_when_github_empty(
     mock_get, atlassian_client
 ):
     """Use oauth application type when plain GitHub returns no detail."""
-    mock_issue_response = {"id": "12345"}
     mock_dev_info_response = {
         "detail": [
             {
@@ -510,8 +507,6 @@ def test_get_story_pull_requests_uses_oauth_variant_when_github_empty(
 
     def side_effect(*args, **kwargs):
         url = args[0]
-        if "rest/api/3/issue/TEST-1" in url:
-            return MockResponse(mock_issue_response)
         if (
             "rest/dev-status/latest/issue/detail" in url
             and "applicationType=oAuth-com.github.integration.production" in url
@@ -523,7 +518,9 @@ def test_get_story_pull_requests_uses_oauth_variant_when_github_empty(
 
     mock_get.side_effect = side_effect
 
-    story_prs = atlassian_client.get_story_pull_requests(["TEST-1"])
+    story_prs = atlassian_client.get_story_pull_requests([
+        ("TEST-1", "12345")
+    ])
 
     assert len(story_prs["TEST-1"]) == 1
     assert story_prs["TEST-1"][0].pr_number == "164"
@@ -534,7 +531,6 @@ def test_get_story_pull_requests_uses_fallback_query_variant(
     mock_get, atlassian_client
 ):
     """Fallback query variant should be used when first detail is empty."""
-    mock_issue_response = {"id": "12345"}
     fallback_detail_response = {
         "detail": [
             {
@@ -549,8 +545,6 @@ def test_get_story_pull_requests_uses_fallback_query_variant(
 
     def side_effect(*args, **kwargs):
         url = args[0]
-        if "rest/api/3/issue/TEST-1" in url:
-            return MockResponse(mock_issue_response)
         if (
             "rest/dev-status/latest/issue/detail" in url
             and "applicationType=oAuth-com.github.integration.production" in url
@@ -568,7 +562,9 @@ def test_get_story_pull_requests_uses_fallback_query_variant(
 
     mock_get.side_effect = side_effect
 
-    story_prs = atlassian_client.get_story_pull_requests(["TEST-1"])
+    story_prs = atlassian_client.get_story_pull_requests([
+        ("TEST-1", "12345")
+    ])
 
     assert len(story_prs["TEST-1"]) == 1
     assert story_prs["TEST-1"][0].pr_number == "165"
@@ -593,8 +589,6 @@ def test_get_story_pull_requests_falls_back_to_github_default(
 
     def side_effect(*args, **kwargs):
         url = args[0]
-        if "rest/api/3/issue/TEST-1" in url:
-            return MockResponse({"id": "12345"})
         if (
             "rest/dev-status/latest/issue/detail" in url
             and "applicationType=oAuth-com.github.integration.production" in url
@@ -618,7 +612,9 @@ def test_get_story_pull_requests_falls_back_to_github_default(
 
     mock_get.side_effect = side_effect
 
-    story_prs = atlassian_client.get_story_pull_requests(["TEST-1"])
+    story_prs = atlassian_client.get_story_pull_requests([
+        ("TEST-1", "12345")
+    ])
 
     assert len(story_prs["TEST-1"]) == 1
     assert story_prs["TEST-1"][0].pr_number == "166"
@@ -629,7 +625,6 @@ def test_get_story_pull_requests_skips_malformed_pr_url(
     mock_get, atlassian_client
 ):
     """Malformed PR URLs should be skipped without failing story lookup."""
-    mock_issue_response = {"id": "12345"}
     mock_dev_info_response = {
         "detail": [
             {
@@ -647,15 +642,15 @@ def test_get_story_pull_requests_skips_malformed_pr_url(
 
     def side_effect(*args, **kwargs):
         url = args[0]
-        if "rest/api/3/issue/TEST-1" in url:
-            return MockResponse(mock_issue_response)
         if "rest/dev-status/latest/issue/detail" in url:
             return MockResponse(mock_dev_info_response)
         return MockResponse({}, 404)
 
     mock_get.side_effect = side_effect
 
-    story_prs = atlassian_client.get_story_pull_requests(["TEST-1"])
+    story_prs = atlassian_client.get_story_pull_requests([
+        ("TEST-1", "12345")
+    ])
 
     assert len(story_prs["TEST-1"]) == 1
     assert story_prs["TEST-1"][0].pr_number == "167"
@@ -668,7 +663,9 @@ def test_get_story_pull_requests_error_handling(mock_get, atlassian_client):
     mock_get.return_value = MockResponse({}, 404)
 
     # Call the method
-    story_prs = atlassian_client.get_story_pull_requests(["TEST-1"])
+    story_prs = atlassian_client.get_story_pull_requests([
+        ("TEST-1", "12345")
+    ])
 
     # Should return empty list for the story
     assert "TEST-1" in story_prs
@@ -774,11 +771,11 @@ def test_get_stories_auth_error(mock_get, status_code, atlassian_client):
 def test_get_story_pull_requests_issue_auth_error(
     mock_get, status_code, atlassian_client
 ):
-    """Test that 401/403 on issue lookup in get_story_pull_requests raises AuthError."""
+    """Test that 401/403 on dev-status in get_story_pull_requests raises AuthError."""
     mock_get.return_value = MockResponse({}, status_code)
 
     with pytest.raises(AuthError):
-        atlassian_client.get_story_pull_requests(["TEST-1"])
+        atlassian_client.get_story_pull_requests([("TEST-1", "12345")])
 
 
 @pytest.mark.parametrize("status_code", [401, 403])
@@ -787,18 +784,10 @@ def test_get_story_pull_requests_dev_auth_error(
     mock_get, status_code, atlassian_client
 ):
     """Test that 401/403 on dev-status in get_story_pull_requests raises AuthError."""
-    mock_issue_response = {"id": "12345"}
-
-    def side_effect(*args, **kwargs):
-        url = args[0]
-        if "rest/api/3/issue" in url:
-            return MockResponse(mock_issue_response)
-        return MockResponse({}, status_code)
-
-    mock_get.side_effect = side_effect
+    mock_get.return_value = MockResponse({}, status_code)
 
     with pytest.raises(AuthError):
-        atlassian_client.get_story_pull_requests(["TEST-1"])
+        atlassian_client.get_story_pull_requests([("TEST-1", "12345")])
 
 
 @patch("requests.get")
@@ -823,10 +812,10 @@ def test_get_stories_rate_limit_error(mock_get, atlassian_client):
 def test_get_story_pull_requests_issue_rate_limit_error(
     mock_get, atlassian_client
 ):
-    """Test that a 429 on issue lookup raises RateLimitError."""
+    """Test that a 429 on dev-status raises RateLimitError."""
     mock_get.return_value = MockResponse({}, 429)
     with pytest.raises(RateLimitError):
-        atlassian_client.get_story_pull_requests(["TEST-1"])
+        atlassian_client.get_story_pull_requests([("TEST-1", "12345")])
 
 
 @patch("requests.get")
@@ -834,18 +823,10 @@ def test_get_story_pull_requests_dev_rate_limit_error(
     mock_get, atlassian_client
 ):
     """Test that a 429 on dev-status raises RateLimitError."""
-    mock_issue_response = {"id": "12345"}
-
-    def side_effect(*args, **kwargs):
-        url = args[0]
-        if "rest/api/3/issue" in url:
-            return MockResponse(mock_issue_response)
-        return MockResponse({}, 429)
-
-    mock_get.side_effect = side_effect
+    mock_get.return_value = MockResponse({}, 429)
 
     with pytest.raises(RateLimitError):
-        atlassian_client.get_story_pull_requests(["TEST-1"])
+        atlassian_client.get_story_pull_requests([("TEST-1", "12345")])
 
 
 @pytest.mark.parametrize("status_code", [404, 500, 503])
