@@ -154,6 +154,56 @@ class AtlassianRequests:
             pr_number=pr_number,
         )
 
+    def _get_story_issue_id(
+        self,
+        story_key: str,
+        headers: dict,
+        auth: tuple[str, str],
+    ) -> str | None:
+        """Resolve Jira issue id for a story key."""
+
+        issue_url = (
+            f"https://{self.jira_instance}/rest/api/3/issue/"
+            f"{story_key}?fields=id"
+        )
+        issue_response = api_get(
+            issue_url,
+            ApiSource.ATLASSIAN,
+            headers,
+            auth=auth,
+            timeout=self.request_timeout,
+            raise_on_error=False,
+        )
+
+        if issue_response.status_code != 200:
+            logger.error(
+                "Error getting issue %s: %s - %s",
+                story_key,
+                issue_response.status_code,
+                issue_response.text,
+            )
+            return None
+
+        issue_data = issue_response.json()
+        return issue_data.get("id")
+
+    def _normalize_story_lookup(
+        self,
+        story: str | tuple[str, str | None],
+    ) -> tuple[str, str | None]:
+        """Normalize story input into (story_key, jira_issue_id)."""
+
+        if isinstance(story, str):
+            return story, None
+
+        if isinstance(story, tuple) and len(story) == 2:
+            return story
+
+        raise TypeError(
+            "story entries must be a story key string or "
+            "(story_key, jira_issue_id) tuple"
+        )
+
     def get_projects(self) -> List[Project]:
         """Get all projects from Jira.
 
@@ -376,6 +426,7 @@ class AtlassianRequests:
                     if release["id"] in releases:
                         story_details = Story(
                             id=None,
+                            jira_issue_id=issue["id"],
                             story_key=issue["key"],
                             story_title=issue["fields"]["summary"],
                             story_type=issue["fields"]["issuetype"]["name"],
@@ -412,7 +463,8 @@ class AtlassianRequests:
         return all_stories
 
     def get_story_pull_requests(
-        self, story_numbers: list[str],
+        self,
+        story_numbers: list[str | tuple[str, str | None]],
     ) -> Dict[str, List[PullRequestIdentifier]]:
         """
         Retrieves GitHub pull request information associated with given Jira
@@ -435,13 +487,23 @@ class AtlassianRequests:
 
         Raises:
             ValueError: If story_numbers is empty or contains empty strings
+            TypeError: If story entries are invalid
         """
         # Validate input
         if not story_numbers:
             raise ValueError("story_numbers list cannot be empty")
 
-        invalid_stories = [s for s in story_numbers if not s]
-        if invalid_stories:
+        normalized_stories = [
+            self._normalize_story_lookup(story)
+            for story in story_numbers
+        ]
+
+        invalid_story_keys = [
+            story_key
+            for story_key, _ in normalized_stories
+            if not isinstance(story_key, str) or not story_key.strip()
+        ]
+        if invalid_story_keys:
             raise ValueError("Story numbers cannot be empty strings")
 
         headers = {
@@ -450,39 +512,21 @@ class AtlassianRequests:
         }
         auth = (self.email, self.token)
 
-        total_stories = len(story_numbers)
+        total_stories = len(normalized_stories)
         stories_attempted = 0
         stories_processed = 0
         stories_processed_without_prs = 0
         failed_story_requests = 0
         story_to_pr_urls = {}
-        for story in story_numbers:
+        for story, issue_id in normalized_stories:
             stories_attempted += 1
 
-            # First get the issue id
-            issue_url = (
-                f"https://{self.jira_instance}/rest/api/3/issue/"
-                f"{story}?fields=id"
-            )
-            issue_response = api_get(
-                issue_url, ApiSource.ATLASSIAN, headers,
-                auth=auth, timeout=self.request_timeout,
-                raise_on_error=False,
-            )
-
-            if issue_response.status_code != 200:
-                logger.error(
-                    "Error getting issue %s: %s - %s",
-                    story,
-                    issue_response.status_code,
-                    issue_response.text,
-                )
-                failed_story_requests += 1
-                story_to_pr_urls[story] = []
-                continue
-
-            issue_data = issue_response.json()
-            issue_id = issue_data["id"]
+            if issue_id is None:
+                issue_id = self._get_story_issue_id(story, headers, auth)
+                if issue_id is None:
+                    failed_story_requests += 1
+                    story_to_pr_urls[story] = []
+                    continue
 
             # Then get development information using the issue id.
             # Jira Cloud tenants can require different combinations here.

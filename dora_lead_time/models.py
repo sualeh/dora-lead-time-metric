@@ -29,6 +29,7 @@ Story = namedtuple(
     'Story',
     [
         'id',
+        'jira_issue_id',
         'story_key',
         'story_title',
         'story_type',

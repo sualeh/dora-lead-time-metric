@@ -158,19 +158,19 @@ def create_releases_database(config: LeadTimeConfiguration):
     logger.info("Finding stories without pull requests")
     pr_lookup_iteration = 0
     while True:
-        story_keys = db_processor.retrieve_stories_without_pull_requests(
+        story_records = db_processor.retrieve_stories_without_pull_requests(
             limit=PULL_REQUEST_BATCH_SIZE
         )
-        if story_keys:
+        if story_records:
             pr_lookup_iteration += 1
             logger.info(
                 "Pull requests iteration %d: "
                 "getting pull requests for %d stories",
                 pr_lookup_iteration,
-                len(story_keys)
+                len(story_records)
             )
             story_pull_requests = atlassian_client.get_story_pull_requests(
-                story_keys
+                story_records
             )
             db_processor.save_story_pull_requests(story_pull_requests)
 

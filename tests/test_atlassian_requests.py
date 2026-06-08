@@ -354,6 +354,7 @@ def test_get_stories(mock_get, atlassian_client):
         "isLast": True,
         "issues": [
             {
+                "id": "55501",
                 "key": "TEST-1",
                 "fields": {
                     "summary": "First test story",
@@ -367,6 +368,7 @@ def test_get_stories(mock_get, atlassian_client):
                 },
             },
             {
+                "id": "55502",
                 "key": "TEST-2",
                 "fields": {
                     "summary": "Second test story",
@@ -393,6 +395,9 @@ def test_get_stories(mock_get, atlassian_client):
     story_keys = [s.story_key for s in stories]
     assert story_keys.count("TEST-1") == 2  # In both releases
     assert story_keys.count("TEST-2") == 1  # In one release
+    story_issue_ids = {s.story_key: s.jira_issue_id for s in stories}
+    assert story_issue_ids["TEST-1"] == "55501"
+    assert story_issue_ids["TEST-2"] == "55502"
 
     # Verify API call parameters
     call_args = mock_get.call_args
@@ -443,6 +448,46 @@ def test_get_story_pull_requests(mock_get, atlassian_client):
     assert first_pr.pr_owner == "org1"
     assert first_pr.pr_repository == "repo1"
     assert first_pr.pr_number == "123"
+
+
+@patch("requests.get")
+def test_get_story_pull_requests_uses_provided_issue_id(
+    mock_get, atlassian_client
+):
+    """Use provided Jira issue id without separate issue lookup call."""
+    mock_dev_info_response = {
+        "detail": [
+            {
+                "pullRequests": [
+                    {
+                        "url": "https://github.com/org/repo/pull/168",
+                    }
+                ]
+            }
+        ]
+    }
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if "rest/api/3/issue" in url:
+            return MockResponse({}, 404)
+        if "rest/dev-status/latest/issue/detail" in url:
+            return MockResponse(mock_dev_info_response)
+        return MockResponse({}, 404)
+
+    mock_get.side_effect = side_effect
+
+    story_prs = atlassian_client.get_story_pull_requests([
+        ("TEST-1", "12345")
+    ])
+
+    assert len(story_prs["TEST-1"]) == 1
+    assert story_prs["TEST-1"][0].pr_number == "168"
+    issue_lookup_calls = [
+        call for call in mock_get.call_args_list
+        if "rest/api/3/issue" in call.args[0]
+    ]
+    assert issue_lookup_calls == []
 
 
 @patch("requests.get")

@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS releases (
 
 CREATE TABLE IF NOT EXISTS stories (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	jira_issue_id VARCHAR(1024),
 	story_key VARCHAR(1024),
 	story_title VARCHAR(1024),
 	story_type VARCHAR(1024),
