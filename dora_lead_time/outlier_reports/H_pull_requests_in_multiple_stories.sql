@@ -5,6 +5,7 @@ SELECT
   pull_requests.pr_repository,
   pull_requests.pr_number,
   pull_requests.pr_title,
+  pull_requests.pr_open,
   pull_requests.pr_url,
   COUNT(DISTINCT stories.story_key) AS story_count
 FROM
@@ -29,6 +30,4 @@ HAVING
   COUNT(DISTINCT stories.story_key) >= 2
 ORDER BY
   story_count DESC,
-  pull_requests.pr_owner,
-  pull_requests.pr_repository,
-  pull_requests.pr_number
+  pull_requests.pr_open DESC

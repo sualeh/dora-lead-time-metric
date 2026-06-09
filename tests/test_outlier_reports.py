@@ -105,6 +105,8 @@ def seeded_db_path(tmp_path) -> str:
              _iso(2), _iso(1), 5, _iso(15), _iso(3)),
             (3, "PR Negative Lead", "acme", "repo", "3",
              _iso(3), _iso(2), 2, _iso(4), _iso(3)),
+            (4, "PR Older Multi Story", "acme", "repo", "4",
+             _iso(8), _iso(7), 2, _iso(9), _iso(8)),
         ],
     )
 
@@ -118,6 +120,8 @@ def seeded_db_path(tmp_path) -> str:
             (1, 2),
             (5, 2),
             (6, 3),
+            (1, 4),
+            (5, 4),
         ],
     )
 
@@ -216,6 +220,7 @@ def test_report_pull_requests_in_multiple_stories(reports):
         "pr_repository",
         "pr_number",
         "pr_title",
+        "pr_open",
         "pr_url",
         "story_count",
     }.issubset(result.columns)
@@ -227,6 +232,9 @@ def test_report_pull_requests_in_multiple_stories(reports):
     single_story_prs = set(result["pr_number"])
     assert "1" not in single_story_prs
     assert "3" not in single_story_prs
+
+    # Tie-break on PR creation date should put newer PRs first.
+    assert list(result["pr_number"]) == ["2", "4"]
 
 
 def test_report_zero_or_negative_lead_times(reports):
