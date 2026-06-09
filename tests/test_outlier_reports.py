@@ -54,7 +54,7 @@ def seeded_db_path(tmp_path) -> str:
 
     cursor.executemany(
         """
-        INSERT INTO stories (id, story_issue_id, story_key, story_title,
+        INSERT INTO stories (id, story_internal_id, story_key, story_title,
                              story_type, story_created, story_resolved)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
