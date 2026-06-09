@@ -19,7 +19,8 @@ class OutlierReports:
 
     This class provides methods to identify potential issues or anomalies
     in the DORA lead time data, such as releases with open pull requests,
-    stories without pull requests, etc.
+    stories without pull requests, and pull requests linked to multiple
+    stories.
 
     Attributes:
         sqlite_path: Path to the SQLite database file.
@@ -222,6 +223,20 @@ class OutlierReports:
             ordered by lead time (ascending) and project key.
         """
         sql = self._read_sql_file("G_zero_or_negative_lead_times")
+        return self.execute_query(sql)
+
+    def report_pull_requests_in_multiple_stories(self) -> pd.DataFrame:
+        """Get pull requests linked to multiple stories.
+
+        Identifies pull requests associated with two or more distinct
+        stories in recently released work, which can indicate coupling
+        across unrelated scope.
+
+        Returns:
+            DataFrame with pull request identifiers and the count of
+            distinct linked stories.
+        """
+        sql = self._read_sql_file("H_pull_requests_in_multiple_stories")
         return self.execute_query(sql)
 
 

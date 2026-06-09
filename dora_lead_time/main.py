@@ -256,6 +256,8 @@ def save_outlier_reports(config: LeadTimeConfiguration):
             outlier_reports.report_stories_without_pull_requests,
         "pull_requests_with_old_commits":
             outlier_reports.report_pull_requests_with_old_commits,
+        "pull_requests_in_multiple_stories":
+            outlier_reports.report_pull_requests_in_multiple_stories,
         "zero_or_negative_lead_times":
             outlier_reports.report_zero_or_negative_lead_times
     }

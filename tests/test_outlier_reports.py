@@ -115,6 +115,7 @@ def seeded_db_path(tmp_path) -> str:
         """,
         [
             (4, 1),
+            (1, 2),
             (5, 2),
             (6, 3),
         ],
@@ -203,6 +204,29 @@ def test_report_pull_requests_with_old_commits(reports):
     assert "days_between" in result.columns
     row = result[result["story_key"] == "OLDCOMMIT-1"].iloc[0]
     assert int(row["days_between"]) > 5
+
+
+def test_report_pull_requests_in_multiple_stories(reports):
+    """PRs linked to multiple distinct stories should be reported."""
+    result = reports.report_pull_requests_in_multiple_stories()
+
+    assert not result.empty
+    assert {
+        "pr_owner",
+        "pr_repository",
+        "pr_number",
+        "pr_title",
+        "pr_url",
+        "story_count",
+    }.issubset(result.columns)
+
+    multi_story_prs = result[result["pr_number"] == "2"]
+    assert not multi_story_prs.empty
+    assert int(multi_story_prs.iloc[0]["story_count"]) >= 2
+
+    single_story_prs = set(result["pr_number"])
+    assert "1" not in single_story_prs
+    assert "3" not in single_story_prs
 
 
 def test_report_zero_or_negative_lead_times(reports):
