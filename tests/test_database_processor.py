@@ -10,7 +10,12 @@ from dora_lead_time.database_processor import (
     PULL_REQUEST_BATCH_SIZE,
     make_sqlite_connection,
 )
-from dora_lead_time.models import Project, PullRequestIdentifier, PullRequest
+from dora_lead_time.models import (
+    Project,
+    PullRequestIdentifier,
+    PullRequest,
+    Story,
+)
 
 
 @pytest.fixture
@@ -59,6 +64,7 @@ def test_create_schema(db_processor):
 
     cursor.execute("PRAGMA table_info(stories);")
     story_columns = {row[1]: row[2].upper() for row in cursor.fetchall()}
+    assert story_columns["story_issue_id"] == "VARCHAR(1024)"
     assert story_columns["story_created"] == "DATETIME"
     assert story_columns["story_resolved"] == "DATETIME"
 
@@ -266,9 +272,72 @@ def test_retrieve_stories_without_pull_requests_uses_default_limit(
     conn.commit()
     conn.close()
 
-    story_keys = db_processor.retrieve_stories_without_pull_requests()
+    story_rows = db_processor.retrieve_stories_without_pull_requests()
 
-    assert len(story_keys) == PULL_REQUEST_BATCH_SIZE
+    assert len(story_rows) == PULL_REQUEST_BATCH_SIZE
+    assert all(len(row) == 2 for row in story_rows)
+
+
+def test_save_stories_persists_story_issue_id(db_processor):
+    """Stories should persist story_issue_id during save."""
+    db_processor.create_schema()
+
+    conn = sqlite3.connect(db_processor.sqlite_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO projects (
+            project_internal_id,
+            project_key,
+            project_title,
+            project_type
+        )
+        VALUES (?, ?, ?, ?)
+        """,
+        ("P1", "TEST", "Test Project", "software"),
+    )
+    cursor.execute(
+        """
+        INSERT INTO releases (
+            release_internal_id,
+            release_title,
+            release_description,
+            release_date,
+            project_id
+        )
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        ("10000", "Release 1", "", "2024-01-01", 1),
+    )
+    conn.commit()
+    conn.close()
+
+    stories = [
+        Story(
+            id=None,
+            story_issue_id="730307",
+            story_key="TEST-1",
+            story_title="First Story",
+            story_type="Story",
+            story_created=datetime(2024, 1, 1, 10, 0, 0),
+            story_resolved=datetime(2024, 1, 2, 10, 0, 0),
+            release_id="10000",
+        )
+    ]
+    db_processor.save_stories(stories)
+
+    conn = sqlite3.connect(db_processor.sqlite_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT story_issue_id, story_key
+        FROM stories
+        """
+    )
+    saved_stories = cursor.fetchall()
+    conn.close()
+
+    assert saved_stories == [("730307", "TEST-1")]
 
 
 def test_retrieve_pull_requests_without_details_honors_explicit_limit(

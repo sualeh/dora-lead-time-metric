@@ -496,6 +496,7 @@ class DatabaseProcessor:
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS stage_stories (
+                    story_issue_id VARCHAR(1024),
                     story_key VARCHAR(1024),
                     story_title VARCHAR(1024),
                     story_type VARCHAR(1024),
@@ -510,6 +511,7 @@ class DatabaseProcessor:
             cursor.executemany(
                 """
                 INSERT INTO stage_stories (
+                    story_issue_id,
                     story_key,
                     story_title,
                     story_type,
@@ -517,7 +519,7 @@ class DatabaseProcessor:
                     story_resolved,
                     release_internal_id
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 stories,
             )
@@ -527,6 +529,7 @@ class DatabaseProcessor:
                 """
                 INSERT OR IGNORE INTO stories
                 (
+                    story_issue_id,
                     story_key,
                     story_title,
                     story_type,
@@ -535,6 +538,7 @@ class DatabaseProcessor:
                     release_id
                 )
                 SELECT
+                    stage_stories.story_issue_id,
                     stage_stories.story_key,
                     stage_stories.story_title,
                     stage_stories.story_type,
@@ -581,16 +585,17 @@ class DatabaseProcessor:
     def retrieve_stories_without_pull_requests(
         self,
         limit: int = PULL_REQUEST_BATCH_SIZE,
-    ) -> list[str]:
+    ) -> list[tuple[str, str | None]]:
         """Retrieves story keys that don't have associated pull requests for
             given projects and date range.
 
         Args:
             limit (int, optional): Maximum number of records to retrieve.
-                Defaults to 0.
+                Defaults to PULL_REQUEST_BATCH_SIZE.
 
         Returns:
-            List of story keys that don't have pull requests mapped to them
+            List[tuple[str, str | None]]: (story key, story issue id)
+                pairs that don't have pull requests mapped to them.
 
         Raises:
             Exception: If there's an error querying the database
@@ -601,7 +606,9 @@ class DatabaseProcessor:
             cursor = conn.cursor()
             query = f"""
                 SELECT
-                    stories.story_key
+                    stories.story_key,
+                    MAX(stories.story_issue_id)
+                        AS story_issue_id
                 FROM
                     stories
                     LEFT OUTER JOIN stories_pull_request_counts
@@ -611,14 +618,15 @@ class DatabaseProcessor:
                         )
                 WHERE
                     stories_pull_request_counts.story_key IS NULL
+                GROUP BY
+                    stories.story_key
                 LIMIT {limit}
                 """
 
             cursor.execute(query)
 
-            story_keys = cursor.fetchall()
-            story_keys = [story_key[0] for story_key in story_keys]
-            logger.info("%d stories without PRs", len(story_keys))
+            stories = cursor.fetchall()
+            logger.info("%d stories without PRs", len(stories))
         except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
             logger.error(
                 """
@@ -627,7 +635,7 @@ class DatabaseProcessor:
                 """,
                 e
             )
-            story_keys = []
+            stories = []
             if conn:
                 conn.rollback()
             raise DatabaseOperationError(
@@ -637,7 +645,7 @@ class DatabaseProcessor:
             if conn:
                 conn.close()
 
-        return story_keys
+        return stories
 
     def save_story_pull_requests(
         self, stories_pull_requests_map

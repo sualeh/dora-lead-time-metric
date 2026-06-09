@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS releases (
 
 CREATE TABLE IF NOT EXISTS stories (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	story_issue_id VARCHAR(1024),
 	story_key VARCHAR(1024),
 	story_title VARCHAR(1024),
 	story_type VARCHAR(1024),
@@ -69,8 +70,9 @@ CREATE TABLE IF NOT EXISTS stories_pull_request_counts (
 	story_key VARCHAR(1024),
 	pr_count INTEGER,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	UNIQUE(story_key),
-	FOREIGN KEY (story_key) REFERENCES stories (story_key)
+	-- This table uses UNIQUE(story_key), while stories uses
+	-- UNIQUE(story_key, release_id); do not define an FK to stories(story_key).
+	UNIQUE(story_key)
 );
 
 DROP VIEW IF EXISTS lead_times;

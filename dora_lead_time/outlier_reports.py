@@ -168,15 +168,16 @@ class OutlierReports:
         return self.execute_query(sql)
 
     def report_counts_of_stories_without_pull_requests(self) -> pd.DataFrame:
-        """Get counts of stories without associated pull requests by project.
+        """Get counts of stories without associated pull requests.
 
-        Provides a summary of projects with stories that don't have
-        associated code changes, which could indicate process issues
-        or incomplete data.
+        Provides a summary grouped by project and story type for
+        stories that don't have associated code changes, which could
+        indicate process issues or incomplete data.
 
         Returns:
             DataFrame with a summary count of stories without pull requests
-            grouped by project, including percentage calculations.
+            grouped by project and story type, including percentage
+            calculations.
         """
         sql = self._read_sql_file("E_counts_of_stories_without_pull_requests")
         return self.execute_query(sql)
@@ -185,11 +186,12 @@ class OutlierReports:
         """Get detailed list of stories without associated pull requests.
 
         Provides the specific stories that don't have any associated
-        code changes, which could indicate process issues or incomplete data.
+        code changes, grouped by project and story type, which could
+        indicate process issues or incomplete data.
 
         Returns:
             DataFrame with detailed information about stories that don't have
-            pull requests linked to them.
+            pull requests linked to them, including story type.
         """
         sql = self._read_sql_file("E_stories_without_pull_requests")
         return self.execute_query(sql)

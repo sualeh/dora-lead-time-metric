@@ -354,6 +354,7 @@ def test_get_stories(mock_get, atlassian_client):
         "isLast": True,
         "issues": [
             {
+                "id": "55501",
                 "key": "TEST-1",
                 "fields": {
                     "summary": "First test story",
@@ -367,6 +368,7 @@ def test_get_stories(mock_get, atlassian_client):
                 },
             },
             {
+                "id": "55502",
                 "key": "TEST-2",
                 "fields": {
                     "summary": "Second test story",
@@ -393,6 +395,9 @@ def test_get_stories(mock_get, atlassian_client):
     story_keys = [s.story_key for s in stories]
     assert story_keys.count("TEST-1") == 2  # In both releases
     assert story_keys.count("TEST-2") == 1  # In one release
+    story_issue_ids = {s.story_key: s.story_issue_id for s in stories}
+    assert story_issue_ids["TEST-1"] == "55501"
+    assert story_issue_ids["TEST-2"] == "55502"
 
     # Verify API call parameters
     call_args = mock_get.call_args
@@ -404,8 +409,6 @@ def test_get_stories(mock_get, atlassian_client):
 def test_get_story_pull_requests(mock_get, atlassian_client):
     """Test getting pull requests associated with stories."""
     # Mock responses
-    mock_issue_response = {"id": "12345"}
-
     mock_dev_info_response = {
         "detail": [
             {
@@ -423,16 +426,16 @@ def test_get_story_pull_requests(mock_get, atlassian_client):
     # Configure mock to return different responses
     def side_effect(*args, **kwargs):
         url = args[0]
-        if "rest/api/3/issue/TEST-1" in url:
-            return MockResponse(mock_issue_response)
-        elif "rest/dev-status" in url:
+        if "rest/dev-status" in url:
             return MockResponse(mock_dev_info_response)
         return MockResponse({}, 404)
 
     mock_get.side_effect = side_effect
 
     # Call the method
-    story_prs = atlassian_client.get_story_pull_requests(["TEST-1"])
+    story_prs = atlassian_client.get_story_pull_requests([
+        ("TEST-1", "12345")
+    ])
 
     # Assertions
     assert "TEST-1" in story_prs
@@ -446,13 +449,347 @@ def test_get_story_pull_requests(mock_get, atlassian_client):
 
 
 @patch("requests.get")
+def test_get_story_pull_requests_uses_provided_issue_id(
+    mock_get, atlassian_client
+):
+    """Use provided Jira issue id without separate issue lookup call."""
+    mock_dev_info_response = {
+        "detail": [
+            {
+                "pullRequests": [
+                    {
+                        "url": "https://github.com/org/repo/pull/168",
+                    }
+                ]
+            }
+        ]
+    }
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if "rest/api/3/issue" in url:
+            return MockResponse({}, 404)
+        if "rest/dev-status/latest/issue/detail" in url:
+            return MockResponse(mock_dev_info_response)
+        return MockResponse({}, 404)
+
+    mock_get.side_effect = side_effect
+
+    story_prs = atlassian_client.get_story_pull_requests([
+        ("TEST-1", "12345")
+    ])
+
+    assert len(story_prs["TEST-1"]) == 1
+    assert story_prs["TEST-1"][0].pr_number == "168"
+    issue_lookup_calls = [
+        call for call in mock_get.call_args_list
+        if "rest/api/3/issue" in call.args[0]
+    ]
+    assert issue_lookup_calls == []
+
+
+@patch("requests.get")
+def test_get_story_pull_requests_uses_oauth_variant_when_github_empty(
+    mock_get, atlassian_client
+):
+    """Use oauth application type when plain GitHub returns no detail."""
+    mock_dev_info_response = {
+        "detail": [
+            {
+                "pullRequests": [
+                    {
+                        "url": "https://github.com/org/repo/pull/164",
+                    }
+                ]
+            }
+        ]
+    }
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if (
+            "rest/dev-status/latest/issue/detail" in url
+            and "applicationType=oAuth-com.github.integration.production" in url
+        ):
+            return MockResponse(mock_dev_info_response)
+        if "rest/dev-status/latest/issue/detail" in url:
+            return MockResponse({"detail": []})
+        return MockResponse({}, 404)
+
+    mock_get.side_effect = side_effect
+
+    story_prs = atlassian_client.get_story_pull_requests([
+        ("TEST-1", "12345")
+    ])
+
+    assert len(story_prs["TEST-1"]) == 1
+    assert story_prs["TEST-1"][0].pr_number == "164"
+
+
+@patch("requests.get")
+def test_get_story_pull_requests_uses_fallback_query_variant(
+    mock_get, atlassian_client
+):
+    """Fallback query variant should be used when first detail is empty."""
+    fallback_detail_response = {
+        "detail": [
+            {
+                "pullRequests": [
+                    {
+                        "url": "https://github.com/org/repo/pull/165",
+                    }
+                ]
+            }
+        ]
+    }
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if (
+            "rest/dev-status/latest/issue/detail" in url
+            and "applicationType=oAuth-com.github.integration.production" in url
+        ):
+            return MockResponse({"detail": []})
+        if (
+            "rest/dev-status/latest/issue/detail" in url
+            and "applicationType=GitHub" in url
+            and "applicationId=oAuth-com.github.integration.production" in url
+        ):
+            return MockResponse(fallback_detail_response)
+        if "rest/dev-status/latest/issue/detail" in url:
+            return MockResponse({"detail": []})
+        return MockResponse({}, 404)
+
+    mock_get.side_effect = side_effect
+
+    story_prs = atlassian_client.get_story_pull_requests([
+        ("TEST-1", "12345")
+    ])
+
+    assert len(story_prs["TEST-1"]) == 1
+    assert story_prs["TEST-1"][0].pr_number == "165"
+
+
+@patch("requests.get")
+def test_get_story_pull_requests_falls_back_to_github_default(
+    mock_get, atlassian_client
+):
+    """Use plain GitHub variant if oauth variants return empty detail."""
+    github_detail_response = {
+        "detail": [
+            {
+                "pullRequests": [
+                    {
+                        "url": "https://github.com/org/repo/pull/166",
+                    }
+                ]
+            }
+        ]
+    }
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if (
+            "rest/dev-status/latest/issue/detail" in url
+            and "applicationType=oAuth-com.github.integration.production" in url
+        ):
+            return MockResponse({"detail": []})
+        if (
+            "rest/dev-status/latest/issue/detail" in url
+            and "applicationType=GitHub" in url
+            and "applicationId=oAuth-com.github.integration.production" in url
+        ):
+            return MockResponse({"detail": []})
+        if (
+            "rest/dev-status/latest/issue/detail" in url
+            and "applicationType=GitHub" in url
+            and "applicationId=" not in url
+        ):
+            return MockResponse(github_detail_response)
+        if "rest/dev-status/latest/issue/detail" in url:
+            return MockResponse({"detail": []})
+        return MockResponse({}, 404)
+
+    mock_get.side_effect = side_effect
+
+    story_prs = atlassian_client.get_story_pull_requests([
+        ("TEST-1", "12345")
+    ])
+
+    assert len(story_prs["TEST-1"]) == 1
+    assert story_prs["TEST-1"][0].pr_number == "166"
+
+
+@patch("requests.get")
+def test_get_story_pull_requests_continues_variants_on_non_200_without_detail(
+    mock_get, atlassian_client
+):
+    """Continue trying variants when no detail is returned, regardless of status."""
+    oauth_detail_response = {
+        "detail": [
+            {
+                "pullRequests": [
+                    {
+                        "url": "https://github.com/org/repo/pull/168",
+                    }
+                ]
+            }
+        ]
+    }
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if (
+            "rest/dev-status/latest/issue/detail" in url
+            and "applicationType=GitHub" in url
+            and "applicationId=" not in url
+        ):
+            return MockResponse({}, 500)
+        if (
+            "rest/dev-status/latest/issue/detail" in url
+            and "applicationType=oAuth-com.github.integration.production" in url
+        ):
+            return MockResponse(oauth_detail_response)
+        if "rest/dev-status/latest/issue/detail" in url:
+            return MockResponse({"detail": []})
+        return MockResponse({}, 404)
+
+    mock_get.side_effect = side_effect
+
+    story_prs = atlassian_client.get_story_pull_requests([
+        ("TEST-1", "12345")
+    ])
+
+    assert len(story_prs["TEST-1"]) == 1
+    assert story_prs["TEST-1"][0].pr_number == "168"
+
+
+@patch("requests.get")
+def test_get_story_pull_requests_stops_after_detail_found(
+    mock_get, atlassian_client
+):
+    """Stop querying variants once detail is found."""
+    github_detail_response = {
+        "detail": [
+            {
+                "pullRequests": [
+                    {
+                        "url": "https://github.com/org/repo/pull/169",
+                    }
+                ]
+            }
+        ]
+    }
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if "rest/dev-status/latest/issue/detail" in url:
+            return MockResponse(github_detail_response)
+        return MockResponse({}, 404)
+
+    mock_get.side_effect = side_effect
+
+    story_prs = atlassian_client.get_story_pull_requests([
+        ("TEST-1", "12345")
+    ])
+
+    dev_status_calls = [
+        call for call in mock_get.call_args_list
+        if "rest/dev-status/latest/issue/detail" in call.args[0]
+    ]
+    assert len(dev_status_calls) == 1
+    assert len(story_prs["TEST-1"]) == 1
+    assert story_prs["TEST-1"][0].pr_number == "169"
+
+
+@patch("requests.get")
+def test_get_story_pull_requests_all_variants_no_detail_is_not_failure(
+    mock_get, atlassian_client
+):
+    """No detail from all variants should produce an empty PR list."""
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if (
+            "rest/dev-status/latest/issue/detail" in url
+            and "applicationType=GitHub" in url
+            and "applicationId=" not in url
+        ):
+            return MockResponse({"detail": []}, 200)
+        if (
+            "rest/dev-status/latest/issue/detail" in url
+            and "applicationType=oAuth-com.github.integration.production" in url
+        ):
+            return MockResponse({}, 500)
+        if (
+            "rest/dev-status/latest/issue/detail" in url
+            and "applicationType=GitHub" in url
+            and "applicationId=oAuth-com.github.integration.production" in url
+        ):
+            return MockResponse({}, 404)
+        return MockResponse({}, 404)
+
+    mock_get.side_effect = side_effect
+
+    story_prs = atlassian_client.get_story_pull_requests([
+        ("TEST-1", "12345")
+    ])
+
+    dev_status_calls = [
+        call for call in mock_get.call_args_list
+        if "rest/dev-status/latest/issue/detail" in call.args[0]
+    ]
+    assert len(dev_status_calls) == 3
+    assert "TEST-1" in story_prs
+    assert story_prs["TEST-1"] == []
+
+
+@patch("requests.get")
+def test_get_story_pull_requests_skips_malformed_pr_url(
+    mock_get, atlassian_client
+):
+    """Malformed PR URLs should be skipped without failing story lookup."""
+    mock_dev_info_response = {
+        "detail": [
+            {
+                "pullRequests": [
+                    {
+                        "url": "https://github.com/org/repo/pull/not-a-number",
+                    },
+                    {
+                        "url": "https://github.com/org/repo/pull/167",
+                    },
+                ]
+            }
+        ]
+    }
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if "rest/dev-status/latest/issue/detail" in url:
+            return MockResponse(mock_dev_info_response)
+        return MockResponse({}, 404)
+
+    mock_get.side_effect = side_effect
+
+    story_prs = atlassian_client.get_story_pull_requests([
+        ("TEST-1", "12345")
+    ])
+
+    assert len(story_prs["TEST-1"]) == 1
+    assert story_prs["TEST-1"][0].pr_number == "167"
+
+
+@patch("requests.get")
 def test_get_story_pull_requests_error_handling(mock_get, atlassian_client):
     """Test error handling when getting pull requests."""
     # Mock a failed API response
     mock_get.return_value = MockResponse({}, 404)
 
     # Call the method
-    story_prs = atlassian_client.get_story_pull_requests(["TEST-1"])
+    story_prs = atlassian_client.get_story_pull_requests([
+        ("TEST-1", "12345")
+    ])
 
     # Should return empty list for the story
     assert "TEST-1" in story_prs
@@ -558,11 +895,11 @@ def test_get_stories_auth_error(mock_get, status_code, atlassian_client):
 def test_get_story_pull_requests_issue_auth_error(
     mock_get, status_code, atlassian_client
 ):
-    """Test that 401/403 on issue lookup in get_story_pull_requests raises AuthError."""
+    """Test that 401/403 on dev-status in get_story_pull_requests raises AuthError."""
     mock_get.return_value = MockResponse({}, status_code)
 
     with pytest.raises(AuthError):
-        atlassian_client.get_story_pull_requests(["TEST-1"])
+        atlassian_client.get_story_pull_requests([("TEST-1", "12345")])
 
 
 @pytest.mark.parametrize("status_code", [401, 403])
@@ -571,18 +908,10 @@ def test_get_story_pull_requests_dev_auth_error(
     mock_get, status_code, atlassian_client
 ):
     """Test that 401/403 on dev-status in get_story_pull_requests raises AuthError."""
-    mock_issue_response = {"id": "12345"}
-
-    def side_effect(*args, **kwargs):
-        url = args[0]
-        if "rest/api/3/issue" in url:
-            return MockResponse(mock_issue_response)
-        return MockResponse({}, status_code)
-
-    mock_get.side_effect = side_effect
+    mock_get.return_value = MockResponse({}, status_code)
 
     with pytest.raises(AuthError):
-        atlassian_client.get_story_pull_requests(["TEST-1"])
+        atlassian_client.get_story_pull_requests([("TEST-1", "12345")])
 
 
 @patch("requests.get")
@@ -607,10 +936,10 @@ def test_get_stories_rate_limit_error(mock_get, atlassian_client):
 def test_get_story_pull_requests_issue_rate_limit_error(
     mock_get, atlassian_client
 ):
-    """Test that a 429 on issue lookup raises RateLimitError."""
+    """Test that a 429 on dev-status raises RateLimitError."""
     mock_get.return_value = MockResponse({}, 429)
     with pytest.raises(RateLimitError):
-        atlassian_client.get_story_pull_requests(["TEST-1"])
+        atlassian_client.get_story_pull_requests([("TEST-1", "12345")])
 
 
 @patch("requests.get")
@@ -618,18 +947,10 @@ def test_get_story_pull_requests_dev_rate_limit_error(
     mock_get, atlassian_client
 ):
     """Test that a 429 on dev-status raises RateLimitError."""
-    mock_issue_response = {"id": "12345"}
-
-    def side_effect(*args, **kwargs):
-        url = args[0]
-        if "rest/api/3/issue" in url:
-            return MockResponse(mock_issue_response)
-        return MockResponse({}, 429)
-
-    mock_get.side_effect = side_effect
+    mock_get.return_value = MockResponse({}, 429)
 
     with pytest.raises(RateLimitError):
-        atlassian_client.get_story_pull_requests(["TEST-1"])
+        atlassian_client.get_story_pull_requests([("TEST-1", "12345")])
 
 
 @pytest.mark.parametrize("status_code", [404, 500, 503])

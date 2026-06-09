@@ -6,6 +6,7 @@ SELECT DISTINCT
   projects.project_key,
   projects.project_title,
   stories.story_key,
+  stories.story_type,
   stories.story_title
 FROM
   stories
@@ -20,3 +21,7 @@ FROM
 WHERE
   pull_requests.id IS NULL
   AND julianday('now') - julianday(releases.release_date) <= 60
+ORDER BY
+  projects.project_key,
+  stories.story_type,
+  stories.story_key

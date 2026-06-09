@@ -4,6 +4,7 @@ import logging
 import os
 import textwrap
 from datetime import date, datetime
+from urllib.parse import urlparse
 from typing import Dict, List, cast
 from dotenv import load_dotenv
 
@@ -98,6 +99,60 @@ class AtlassianRequests:
             user_info.get("self"),
         )
         return user_info
+
+    def _build_dev_detail_query_variants(
+        self,
+        issue_id: str,
+    ) -> list[str]:
+        """Build ordered detail query variants for GitHub integrations."""
+
+        query_variants = [
+            (
+                f"issueId={issue_id}&applicationType=GitHub"
+                "&dataType=pullrequest"
+            ),
+            (
+                "issueId="
+                f"{issue_id}&applicationType="
+                "oAuth-com.github.integration.production"
+                "&dataType=pullrequest"
+            ),
+            (
+                f"issueId={issue_id}&applicationType=GitHub"
+                "&applicationId=oAuth-com.github.integration.production"
+                "&dataType=pullrequest"
+            ),
+        ]
+
+        return list(dict.fromkeys(query_variants))
+
+    def _to_pull_request_identifier(
+        self, pr_url: str
+    ) -> PullRequestIdentifier | None:
+        """Convert a GitHub PR URL to PullRequestIdentifier."""
+
+        parsed = urlparse(pr_url)
+        path_parts = [part for part in parsed.path.split("/") if part]
+        if len(path_parts) < 4 or path_parts[2] != "pull":
+            logger.warning("Skipping unsupported pull request URL: %s", pr_url)
+            return None
+
+        owner = path_parts[0]
+        repo = path_parts[1]
+        pr_number = path_parts[3]
+        if not pr_number.isdigit():
+            logger.warning(
+                "Skipping pull request URL with invalid id: %s",
+                pr_url,
+            )
+            return None
+
+        return PullRequestIdentifier(
+            id=None,
+            pr_owner=owner,
+            pr_repository=repo,
+            pr_number=pr_number,
+        )
 
     def get_projects(self) -> List[Project]:
         """Get all projects from Jira.
@@ -321,6 +376,7 @@ class AtlassianRequests:
                     if release["id"] in releases:
                         story_details = Story(
                             id=None,
+                            story_issue_id=issue["id"],
                             story_key=issue["key"],
                             story_title=issue["fields"]["summary"],
                             story_type=issue["fields"]["issuetype"]["name"],
@@ -357,7 +413,8 @@ class AtlassianRequests:
         return all_stories
 
     def get_story_pull_requests(
-        self, story_numbers: list[str],
+        self,
+        story_numbers: list[tuple[str, str | None]],
     ) -> Dict[str, List[PullRequestIdentifier]]:
         """
         Retrieves GitHub pull request information associated with given Jira
@@ -367,8 +424,9 @@ class AtlassianRequests:
         requests linked to the specified stories.
 
         Args:
-            story_numbers: List of Jira story identifiers
-                (e.g., ['SRTN-864', 'SRTN-865'])
+            story_numbers: List of story records as tuples
+                (story_key, story_issue_id), e.g.
+                [('SRTN-864', '12345'), ('SRTN-865', '12346')]
 
         Returns:
             Dict[str, List[PullRequestIdentifier]]: A dictionary mapping
@@ -380,13 +438,25 @@ class AtlassianRequests:
 
         Raises:
             ValueError: If story_numbers is empty or contains empty strings
+            TypeError: If story entries are invalid
         """
         # Validate input
         if not story_numbers:
             raise ValueError("story_numbers list cannot be empty")
 
-        invalid_stories = [s for s in story_numbers if not s]
-        if invalid_stories:
+        for story in story_numbers:
+            if not isinstance(story, tuple) or len(story) != 2:
+                raise TypeError(
+                    "story entries must be (story_key, story_issue_id) "
+                    "tuples"
+                )
+
+        invalid_story_keys = [
+            story_key
+            for story_key, _ in story_numbers
+            if not isinstance(story_key, str) or not story_key.strip()
+        ]
+        if invalid_story_keys:
             raise ValueError("Story numbers cannot be empty strings")
 
         headers = {
@@ -401,60 +471,58 @@ class AtlassianRequests:
         stories_processed_without_prs = 0
         failed_story_requests = 0
         story_to_pr_urls = {}
-        for story in story_numbers:
+        for story, issue_id in story_numbers:
             stories_attempted += 1
 
-            # First get the issue id
-            issue_url = (
-                f"https://{self.jira_instance}/rest/api/3/issue/"
-                f"{story}?fields=id"
-            )
-            issue_response = api_get(
-                issue_url, ApiSource.ATLASSIAN, headers,
-                auth=auth, timeout=self.request_timeout,
-                raise_on_error=False,
-            )
-
-            if issue_response.status_code != 200:
+            if issue_id is None:
                 logger.error(
-                    "Error getting issue %s: %s - %s",
+                    "Missing story_issue_id for story %s; skipping",
                     story,
-                    issue_response.status_code,
-                    issue_response.text,
                 )
                 failed_story_requests += 1
                 story_to_pr_urls[story] = []
                 continue
 
-            issue_data = issue_response.json()
-            issue_id = issue_data["id"]
-
-            # Then get development information using the issue id
-            dev_url = (
-                "https://"
-                f"{self.jira_instance}/rest/dev-status/latest/issue/detail"
-                f"?issueId={issue_id}"
-                f"&applicationType=GitHub"
-                f"&dataType=pullrequest"
-            )
-            dev_response = api_get(
-                dev_url, ApiSource.ATLASSIAN, headers,
-                auth=auth, timeout=self.request_timeout,
-                raise_on_error=False,
+            # Then get development information using the issue id.
+            # Jira Cloud tenants can require different combinations here.
+            query_variants = self._build_dev_detail_query_variants(
+                issue_id=issue_id,
             )
 
-            if dev_response.status_code != 200:
-                logger.error(
-                    "Error getting development info for %s: %s - %s",
-                    story,
-                    dev_response.status_code,
-                    dev_response.text,
+            dev_data = {"detail": []}
+            detail_found = False
+            for query in query_variants:
+                dev_url = (
+                    "https://"
+                    f"{self.jira_instance}/rest/dev-status/latest/issue/"
+                    f"detail?{query}"
                 )
-                failed_story_requests += 1
-                story_to_pr_urls[story] = []
-                continue
+                dev_response = api_get(
+                    dev_url,
+                    ApiSource.ATLASSIAN,
+                    headers,
+                    auth=auth,
+                    timeout=self.request_timeout,
+                    raise_on_error=False,
+                )
 
-            dev_data = dev_response.json()
+                # Only stop once pull request detail is found.
+                try:
+                    dev_data = dev_response.json()
+                except ValueError:
+                    dev_data = {"detail": []}
+
+                if dev_data.get("detail"):
+                    detail_found = True
+                    break
+
+            if not detail_found:
+                logger.info(
+                    "No pull request detail returned for %s (issueId=%s)",
+                    story,
+                    issue_id,
+                )
+
             pr_urls = []
 
             # Extract PR URLs from development data
@@ -462,18 +530,11 @@ class AtlassianRequests:
             for repository in detail:
                 for pr in repository.get("pullRequests", []):
                     if "url" in pr:
-                        # Parse URL to get owner, repo, and PR number
-                        parts = pr["url"].split("/")
-                        owner = parts[3]
-                        repo = parts[4]
-                        pr_number = str(int(parts[6]))
-                        pull_request = PullRequestIdentifier(
-                            id=None,
-                            pr_owner=owner,
-                            pr_repository=repo,
-                            pr_number=pr_number
+                        pull_request = self._to_pull_request_identifier(
+                            pr["url"]
                         )
-                        pr_urls.append(pull_request)
+                        if pull_request is not None:
+                            pr_urls.append(pull_request)
 
             story_to_pr_urls[story] = pr_urls
 
