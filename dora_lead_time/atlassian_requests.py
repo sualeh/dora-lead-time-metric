@@ -398,7 +398,7 @@ class AtlassianRequests:
                 """).strip(),
                 len(data["issues"]),
                 issues_processed,
-                len(all_stories)
+                len(all_stories),
             )
 
             # Safety check - if we got an empty batch but haven't reached

@@ -51,7 +51,7 @@ def test_create_schema(db_processor):
     assert "releases_stories" in tables
     assert "pull_requests" in tables
     assert "stories_pull_requests" in tables
-    assert "stories_pull_request_counts" in tables
+    assert "stories_without_pull_requests" in tables
 
     # Check if view exists
     cursor.execute("SELECT name FROM sqlite_master WHERE type='view';")
@@ -71,14 +71,15 @@ def test_create_schema(db_processor):
     assert story_columns["story_resolved"] == "DATETIME"
     assert "release_id" not in story_columns
 
-    cursor.execute("PRAGMA table_info(stories_pull_request_counts);")
-    spr_rows = cursor.fetchall()
-    spr_columns = {row[1]: row[2].upper() for row in spr_rows}
-    spr_pk_columns = {row[1] for row in spr_rows if row[5] == 1}
-    assert "story_id" in spr_columns
-    assert "story_key" not in spr_columns
-    assert "id" not in spr_columns
-    assert spr_pk_columns == {"story_id"}
+    cursor.execute(
+        "PRAGMA table_info(stories_without_pull_requests);"
+    )
+    marker_rows = cursor.fetchall()
+    marker_columns = {row[1]: row[2].upper() for row in marker_rows}
+    marker_pk_columns = {row[1] for row in marker_rows if row[5] == 1}
+    assert marker_columns["story_id"] == "INTEGER"
+    assert marker_columns["processed_at"] == "DATETIME"
+    assert marker_pk_columns == {"story_id"}
 
     cursor.execute("PRAGMA table_info(pull_requests);")
     pr_columns = {row[1]: row[2].upper() for row in cursor.fetchall()}
@@ -288,6 +289,115 @@ def test_retrieve_stories_without_pull_requests_uses_default_limit(
 
     assert len(story_rows) == PULL_REQUEST_BATCH_SIZE
     assert all(len(row) == 2 for row in story_rows)
+
+
+def test_save_story_pull_requests_marks_only_zero_pr_stories(db_processor):
+    """Only stories without PRs should be added to the marker table."""
+    db_processor.create_schema()
+
+    conn = sqlite3.connect(db_processor.sqlite_path)
+    cursor = conn.cursor()
+    cursor.executemany(
+        """
+        INSERT INTO stories (story_key, story_title)
+        VALUES (?, ?)
+        """,
+        [
+            ("MARK-1", "Has PR"),
+            ("MARK-2", "No PR"),
+        ],
+    )
+    conn.commit()
+    conn.close()
+
+    db_processor.save_story_pull_requests(
+        {
+            "MARK-1": [
+                PullRequestIdentifier(
+                    id=None,
+                    pr_owner="owner",
+                    pr_repository="repo",
+                    pr_number="100",
+                )
+            ],
+            "MARK-2": [],
+        }
+    )
+
+    conn = sqlite3.connect(db_processor.sqlite_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT stories.story_key
+        FROM stories_without_pull_requests markers
+        JOIN stories ON markers.story_id = stories.id
+        """
+    )
+    marked_story_keys = [row[0] for row in cursor.fetchall()]
+
+    cursor.execute(
+        """
+        SELECT COUNT(*)
+        FROM stories_pull_requests
+        JOIN stories ON stories_pull_requests.story_id = stories.id
+        WHERE stories.story_key = 'MARK-1'
+        """
+    )
+    mark_1_pr_link_count = cursor.fetchone()[0]
+    conn.close()
+
+    assert marked_story_keys == ["MARK-2"]
+    assert mark_1_pr_link_count == 1
+
+
+def test_retrieve_stories_without_pull_requests_ignores_processed_stories(
+    db_processor,
+):
+    """Processed stories should be excluded from PR lookup retrieval."""
+    db_processor.create_schema()
+
+    conn = sqlite3.connect(db_processor.sqlite_path)
+    cursor = conn.cursor()
+    cursor.executemany(
+        """
+        INSERT INTO stories (story_key, story_title)
+        VALUES (?, ?)
+        """,
+        [
+            ("TODO-1", "Needs lookup"),
+            ("ZERO-1", "No PR marker"),
+            ("LINK-1", "Already linked"),
+        ],
+    )
+    cursor.execute(
+        """
+        INSERT INTO stories_without_pull_requests (story_id)
+        SELECT id FROM stories WHERE story_key = 'ZERO-1'
+        """
+    )
+    cursor.execute(
+        """
+        INSERT INTO pull_requests (pr_owner, pr_repository, pr_number)
+        VALUES ('owner', 'repo', '42')
+        """
+    )
+    cursor.execute(
+        """
+        INSERT INTO stories_pull_requests (story_id, pr_id)
+        SELECT stories.id, pull_requests.id
+        FROM stories
+        CROSS JOIN pull_requests
+        WHERE stories.story_key = 'LINK-1'
+          AND pull_requests.pr_number = '42'
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    pending_stories = db_processor.retrieve_stories_without_pull_requests()
+    pending_story_keys = [row[0] for row in pending_stories]
+
+    assert pending_story_keys == ["TODO-1"]
 
 
 def test_save_stories_persists_story_internal_id(db_processor):

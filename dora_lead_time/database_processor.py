@@ -628,17 +628,20 @@ class DatabaseProcessor:
             cursor = conn.cursor()
             query = f"""
                 SELECT
-                    stories.story_key,
+                    DISTINCT stories.story_key,
                     stories.story_internal_id
                 FROM
                     stories
-                    LEFT OUTER JOIN stories_pull_request_counts
+                    LEFT OUTER JOIN stories_without_pull_requests
                         ON (
                             stories.id
-                            = stories_pull_request_counts.story_id
+                            = stories_without_pull_requests.story_id
                         )
+                    LEFT OUTER JOIN stories_pull_requests
+                        ON stories.id = stories_pull_requests.story_id
                 WHERE
-                    stories_pull_request_counts.story_id IS NULL
+                    stories_without_pull_requests.story_id IS NULL
+                    AND stories_pull_requests.story_id IS NULL
                 LIMIT {limit}
                 """
 
@@ -680,12 +683,11 @@ class DatabaseProcessor:
         """
         conn = None
         try:
-            # Count total PRs across all stories (keyed by story_key for now;
-            # resolved to story_id during insert below)
-            stories_pull_request_counts_by_key = {
-                story: len(urls)
+            zero_pr_story_keys = [
+                story
                 for story, urls in stories_pull_requests_map.items()
-            }
+                if not urls
+            ]
             stories_pull_requests = [
                 (
                     story,
@@ -705,113 +707,107 @@ class DatabaseProcessor:
             conn = self._get_connection()
             cursor = conn.cursor()
 
-            cursor.execute(
-                """
-                DROP TABLE IF EXISTS stage_stories_pull_requests
-                """
-            )
-
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS stage_stories_pull_requests (
-                    story_key VARCHAR(1024),
-                    pr_owner VARCHAR(1024),
-                    pr_repository VARCHAR(1024),
-                    pr_number VARCHAR(1024)
+            if stories_pull_requests:
+                cursor.execute(
+                    """
+                    DROP TABLE IF EXISTS stage_stories_pull_requests
+                    """
                 )
-                """
-            )
 
-            cursor.executemany(
-                """
-                INSERT INTO stage_stories_pull_requests (
-                    story_key,
-                    pr_owner,
-                    pr_repository,
-                    pr_number
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS stage_stories_pull_requests (
+                        story_key VARCHAR(1024),
+                        pr_owner VARCHAR(1024),
+                        pr_repository VARCHAR(1024),
+                        pr_number VARCHAR(1024)
+                    )
+                    """
                 )
-                VALUES (?, ?, ?, ?)
-                """,
-                stories_pull_requests,
-            )
-            logger.info("Staged %d PRs for stories", cursor.rowcount)
 
-            # Insert PRs
-            cursor.execute(
-                """
-                INSERT OR IGNORE INTO pull_requests
-                (
-                    pr_owner,
-                    pr_repository,
-                    pr_number
+                cursor.executemany(
+                    """
+                    INSERT INTO stage_stories_pull_requests (
+                        story_key,
+                        pr_owner,
+                        pr_repository,
+                        pr_number
+                    )
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    stories_pull_requests,
                 )
-                SELECT
-                    stage_stories_pull_requests.pr_owner,
-                    stage_stories_pull_requests.pr_repository,
-                    stage_stories_pull_requests.pr_number
-                FROM
-                    stage_stories_pull_requests
-                """
-            )
-            logger.info("Inserted %d PRs", cursor.rowcount)
+                logger.info("Staged %d PRs for stories", cursor.rowcount)
 
-            # Insert into to PR mapping table
-            cursor.execute(
-                """
-                INSERT OR IGNORE INTO stories_pull_requests(
-                                        story_id,
-                                        pr_id
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO pull_requests
+                    (
+                        pr_owner,
+                        pr_repository,
+                        pr_number
+                    )
+                    SELECT
+                        stage_stories_pull_requests.pr_owner,
+                        stage_stories_pull_requests.pr_repository,
+                        stage_stories_pull_requests.pr_number
+                    FROM
+                        stage_stories_pull_requests
+                    """
                 )
-                SELECT
-                    stories.id,
-                    pull_requests.id
-                FROM
-                    stage_stories_pull_requests
-                    JOIN stories
-                        ON (
-                            stage_stories_pull_requests.story_key
-                            = stories.story_key
-                        )
-                    JOIN pull_requests
-                        ON (
-                            stage_stories_pull_requests.pr_owner
-                            = pull_requests.pr_owner
-                            AND stage_stories_pull_requests.pr_repository
-                            = pull_requests.pr_repository
-                            AND stage_stories_pull_requests.pr_number
-                            = pull_requests.pr_number
-                        )
-                """
-            )
-            logger.info("Inserted %d PRs for stories", cursor.rowcount)
+                logger.info("Inserted %d PRs", cursor.rowcount)
 
-            cursor.execute(
-                """
-                DROP TABLE IF EXISTS stage_stories_pull_requests
-                """
-            )
-
-            cursor.executemany(
-                """
-                INSERT OR IGNORE INTO stories_pull_request_counts (
-                    story_id,
-                    pr_count
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO stories_pull_requests(
+                                            story_id,
+                                            pr_id
+                    )
+                    SELECT
+                        stories.id,
+                        pull_requests.id
+                    FROM
+                        stage_stories_pull_requests
+                        JOIN stories
+                            ON (
+                                stage_stories_pull_requests.story_key
+                                = stories.story_key
+                            )
+                        JOIN pull_requests
+                            ON (
+                                stage_stories_pull_requests.pr_owner
+                                = pull_requests.pr_owner
+                                AND stage_stories_pull_requests.pr_repository
+                                = pull_requests.pr_repository
+                                AND stage_stories_pull_requests.pr_number
+                                = pull_requests.pr_number
+                            )
+                    """
                 )
-                SELECT stories.id, ?
-                FROM stories
-                WHERE stories.story_key = ?
-                """,
-                [
-                    (count, key)
-                    for key, count
-                    in stories_pull_request_counts_by_key.items()
-                ],
-            )
-            logger.info(
-                "Inserted %d story PR counts, "
-                "to register that the PRs have been retrieved, even if zero",
-                cursor.rowcount,
-            )
+                logger.info("Inserted %d PRs for stories", cursor.rowcount)
+
+                cursor.execute(
+                    """
+                    DROP TABLE IF EXISTS stage_stories_pull_requests
+                    """
+                )
+
+            if zero_pr_story_keys:
+                cursor.executemany(
+                    """
+                    INSERT OR IGNORE INTO stories_without_pull_requests (
+                        story_id
+                    )
+                    SELECT stories.id
+                    FROM stories
+                    WHERE stories.story_key = ?
+                    """,
+                    [(key,) for key in zero_pr_story_keys],
+                )
+                logger.info(
+                    "Inserted %d stories with zero pull requests",
+                    cursor.rowcount,
+                )
 
             conn.commit()
         except (
