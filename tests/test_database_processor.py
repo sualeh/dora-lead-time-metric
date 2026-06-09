@@ -15,6 +15,7 @@ from dora_lead_time.models import (
     PullRequestIdentifier,
     PullRequest,
     Story,
+    StoryInRelease,
 )
 
 
@@ -325,17 +326,14 @@ def test_save_stories_persists_story_internal_id(db_processor):
     conn.close()
 
     stories = [
-        (
-            Story(
-                id=None,
-                story_internal_id="730307",
-                story_key="TEST-1",
-                story_title="First Story",
-                story_type="Story",
-                story_created=datetime(2024, 1, 1, 10, 0, 0),
-                story_resolved=datetime(2024, 1, 2, 10, 0, 0),
-            ),
-            "10000",
+        StoryInRelease(
+            story_internal_id="730307",
+            story_key="TEST-1",
+            story_title="First Story",
+            story_type="Story",
+            story_created=datetime(2024, 1, 1, 10, 0, 0),
+            story_resolved=datetime(2024, 1, 2, 10, 0, 0),
+            release_internal_id="10000",
         )
     ]
     db_processor.save_stories(stories)
@@ -399,29 +397,23 @@ def test_save_stories_links_one_story_to_multiple_releases(db_processor):
     conn.close()
 
     stories = [
-        (
-            Story(
-                id=None,
-                story_internal_id="999",
-                story_key="MULTI-1",
-                story_title="Multi-release Story",
-                story_type="Story",
-                story_created=datetime(2024, 1, 1, 0, 0, 0),
-                story_resolved=datetime(2024, 1, 10, 0, 0, 0),
-            ),
-            "20000",
+        StoryInRelease(
+            story_internal_id="999",
+            story_key="MULTI-1",
+            story_title="Multi-release Story",
+            story_type="Story",
+            story_created=datetime(2024, 1, 1, 0, 0, 0),
+            story_resolved=datetime(2024, 1, 10, 0, 0, 0),
+            release_internal_id="20000",
         ),
-        (
-            Story(
-                id=None,
-                story_internal_id="999",
-                story_key="MULTI-1",
-                story_title="Multi-release Story",
-                story_type="Story",
-                story_created=datetime(2024, 1, 1, 0, 0, 0),
-                story_resolved=datetime(2024, 1, 10, 0, 0, 0),
-            ),
-            "20001",
+        StoryInRelease(
+            story_internal_id="999",
+            story_key="MULTI-1",
+            story_title="Multi-release Story",
+            story_type="Story",
+            story_created=datetime(2024, 1, 1, 0, 0, 0),
+            story_resolved=datetime(2024, 1, 10, 0, 0, 0),
+            release_internal_id="20001",
         ),
     ]
     db_processor.save_stories(stories)
@@ -443,6 +435,83 @@ def test_save_stories_links_one_story_to_multiple_releases(db_processor):
 
     assert story_count == 1, "Only one canonical story row should exist"
     assert link_count == 2, "Story should be linked to both releases"
+
+
+def test_save_stories_links_by_story_internal_id(db_processor):
+    """Story-release linking should use stable story_internal_id."""
+    db_processor.create_schema()
+
+    conn = sqlite3.connect(db_processor.sqlite_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO projects (project_internal_id, project_key,
+                              project_title, project_type)
+        VALUES (?, ?, ?, ?)
+        """,
+        ("P1", "TEST", "Test Project", "software"),
+    )
+    cursor.executemany(
+        """
+        INSERT INTO releases (release_internal_id, release_title,
+                              release_description, release_date, project_id)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        [
+            ("30000", "Release A", "", "2024-01-01", 1),
+            ("30001", "Release B", "", "2024-02-01", 1),
+        ],
+    )
+    conn.commit()
+    conn.close()
+
+    stories = [
+        StoryInRelease(
+            story_internal_id="1001",
+            story_key="RENAMED-OLD",
+            story_title="Renamed Story",
+            story_type="Story",
+            story_created=datetime(2024, 1, 1, 0, 0, 0),
+            story_resolved=datetime(2024, 1, 10, 0, 0, 0),
+            release_internal_id="30000",
+        ),
+        StoryInRelease(
+            story_internal_id="1001",
+            story_key="RENAMED-NEW",
+            story_title="Renamed Story",
+            story_type="Story",
+            story_created=datetime(2024, 1, 1, 0, 0, 0),
+            story_resolved=datetime(2024, 1, 10, 0, 0, 0),
+            release_internal_id="30001",
+        ),
+    ]
+
+    db_processor.save_stories(stories)
+
+    conn = sqlite3.connect(db_processor.sqlite_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT COUNT(*)
+        FROM stories
+        WHERE story_internal_id = '1001'
+        """
+    )
+    story_count = cursor.fetchone()[0]
+
+    cursor.execute(
+        """
+        SELECT COUNT(*)
+        FROM releases_stories
+        JOIN stories ON releases_stories.story_id = stories.id
+        WHERE stories.story_internal_id = '1001'
+        """
+    )
+    link_count = cursor.fetchone()[0]
+    conn.close()
+
+    assert story_count == 1
+    assert link_count == 2
 
 
 def test_retrieve_pull_requests_without_details_honors_explicit_limit(

@@ -15,7 +15,7 @@ from dora_lead_time.api_client import (
 from dora_lead_time.models import (
     Project,
     Release,
-    Story,
+    StoryInRelease,
     PullRequestIdentifier,
 )
 
@@ -287,17 +287,18 @@ class AtlassianRequests:
 
     def get_stories(
         self, releases: list[str],
-    ) -> List[tuple]:
+    ) -> List[StoryInRelease]:
         """Retrieve stories by fix version IDs from Jira.
 
         Args:
             releases: List of Jira fix version IDs as strings
 
         Returns:
-            List[tuple]: List of (Story, release_internal_id) pairs where
-            Story contains (story_key, story_title, story_type,
-            story_created, story_resolved) and release_internal_id is the
-            Jira fix version ID that links the story to a release.
+            List[StoryInRelease]: Flattened StoryInRelease rows with
+            story_internal_id, story_key, story_title, story_type,
+            story_created, story_resolved, and release_internal_id.
+            This is the minimum contract that preserves current
+            persistence and outlier-report behavior.
 
         Raises:
             TypeError: If releases parameter is not a list or does not
@@ -375,16 +376,17 @@ class AtlassianRequests:
                 )
                 for release in issue["fields"]["fixVersions"]:
                     if release["id"] in releases:
-                        story_details = Story(
-                            id=None,
-                            story_internal_id=issue["id"],
-                            story_key=issue["key"],
-                            story_title=issue["fields"]["summary"],
-                            story_type=issue["fields"]["issuetype"]["name"],
-                            story_created=created,
-                            story_resolved=resolved,
+                        all_stories.append(
+                            StoryInRelease(
+                                story_internal_id=issue["id"],
+                                story_key=issue["key"],
+                                story_title=issue["fields"]["summary"],
+                                story_type=issue["fields"]["issuetype"]["name"],
+                                story_created=created,
+                                story_resolved=resolved,
+                                release_internal_id=release["id"],
+                            )
                         )
-                        all_stories.append((story_details, release["id"]))
 
             # Move to next batch
             issues_processed += len(data["issues"])

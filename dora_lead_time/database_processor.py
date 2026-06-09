@@ -5,7 +5,11 @@ import os
 import pathlib
 import sqlite3
 from datetime import date, datetime
-from dora_lead_time.models import PullRequestIdentifier, Project
+from dora_lead_time.models import (
+    PullRequestIdentifier,
+    Project,
+    StoryInRelease,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -468,12 +472,12 @@ class DatabaseProcessor:
 
         return release_ids
 
-    def save_stories(self, stories) -> None:
+    def save_stories(self, stories: list[StoryInRelease]) -> None:
         """Saves stories to the database.
 
         Args:
-            stories: List of (Story, release_internal_id) pairs to save.
-                Each Story is inserted once by story_key uniqueness, then
+            stories: List of flattened StoryInRelease rows to save. Each
+                story is inserted once by story_internal_id uniqueness, then
                 linked to its release via the releases_stories join table.
 
         Raises:
@@ -498,6 +502,7 @@ class DatabaseProcessor:
                     story_created DATETIME,
                     story_resolved DATETIME,
                     release_internal_id VARCHAR(1024),
+                    UNIQUE(story_internal_id, release_internal_id),
                     UNIQUE(story_key, release_internal_id)
                 )
                 """
@@ -505,15 +510,15 @@ class DatabaseProcessor:
 
             staging_rows = [
                 (
-                    story.story_internal_id,
-                    story.story_key,
-                    story.story_title,
-                    story.story_type,
-                    story.story_created,
-                    story.story_resolved,
-                    release_internal_id,
+                    story_release.story_internal_id,
+                    story_release.story_key,
+                    story_release.story_title,
+                    story_release.story_type,
+                    story_release.story_created,
+                    story_release.story_resolved,
+                    story_release.release_internal_id,
                 )
-                for story, release_internal_id in stories
+                for story_release in stories
             ]
 
             cursor.executemany(
@@ -575,7 +580,10 @@ class DatabaseProcessor:
                             = releases.release_internal_id
                         )
                     JOIN stories
-                        ON stage_stories.story_key = stories.story_key
+                        ON (
+                            stage_stories.story_internal_id
+                            = stories.story_internal_id
+                        )
                 """
             )
             logger.info(

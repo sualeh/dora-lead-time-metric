@@ -25,6 +25,7 @@ GROUP BY
   pull_requests.pr_repository,
   pull_requests.pr_number,
   pull_requests.pr_title,
+  pull_requests.pr_open,
   pull_requests.pr_url
 HAVING
   COUNT(DISTINCT stories.story_key) >= 2
