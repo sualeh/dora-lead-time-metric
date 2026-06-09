@@ -6,8 +6,10 @@ WITH duplicate_stories AS (
     stories.story_key
   FROM
     stories
+    JOIN releases_stories
+      ON releases_stories.story_id = stories.id
     JOIN releases
-      ON stories.release_id = releases.id
+      ON releases_stories.release_id = releases.id
   WHERE
     releases.release_date >= date('now', '-60 days')
   GROUP BY
@@ -23,8 +25,10 @@ SELECT
   releases.release_date
 FROM
   stories
+  JOIN releases_stories
+    ON releases_stories.story_id = stories.id
   JOIN releases
-    ON stories.release_id = releases.id
+    ON releases_stories.release_id = releases.id
 WHERE
   stories.story_key IN (
     SELECT

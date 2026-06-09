@@ -244,20 +244,22 @@ def save_outlier_reports(config: LeadTimeConfiguration):
     report_mapping = {
         "projects_without_releases":
             outlier_reports.report_projects_without_releases,
-        "releases_with_open_stories":
-            outlier_reports.report_releases_with_open_stories,
-        "stories_in_multiple_releases":
-            outlier_reports.report_stories_in_multiple_releases,
+        "zero_or_negative_lead_times":
+            outlier_reports.report_zero_or_negative_lead_times,
         "releases_with_open_pull_requests":
             outlier_reports.report_releases_with_open_pull_requests,
-        "counts_of_stories_without_pull_requests":
-            outlier_reports.report_counts_of_stories_without_pull_requests,
-        "stories_without_pull_requests":
-            outlier_reports.report_stories_without_pull_requests,
+        "releases_with_open_stories":
+            outlier_reports.report_releases_with_open_stories,
         "pull_requests_with_old_commits":
             outlier_reports.report_pull_requests_with_old_commits,
-        "zero_or_negative_lead_times":
-            outlier_reports.report_zero_or_negative_lead_times
+        "stories_in_multiple_releases":
+            outlier_reports.report_stories_in_multiple_releases,
+        "pull_requests_in_multiple_stories":
+            outlier_reports.report_pull_requests_in_multiple_stories,
+        "stories_without_pull_requests":
+            outlier_reports.report_stories_without_pull_requests,
+        "counts_of_stories_without_pull_requests":
+            outlier_reports.report_counts_of_stories_without_pull_requests
     }
 
     # Generate and save each report

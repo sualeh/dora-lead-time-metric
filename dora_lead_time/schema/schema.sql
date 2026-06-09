@@ -29,10 +29,19 @@ CREATE TABLE IF NOT EXISTS stories (
 	story_type VARCHAR(1024),
 	story_created DATETIME,
 	story_resolved DATETIME,
-	release_id VARCHAR(1024),
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	UNIQUE(story_key, release_id),
-	FOREIGN KEY (release_id) REFERENCES releases (id)
+	UNIQUE(story_issue_id),
+	UNIQUE(story_key)
+);
+
+CREATE TABLE IF NOT EXISTS releases_stories (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	release_id INTEGER,
+	story_id INTEGER,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	UNIQUE(release_id, story_id),
+	FOREIGN KEY (release_id) REFERENCES releases (id),
+	FOREIGN KEY (story_id) REFERENCES stories (id)
 );
 
 CREATE TABLE IF NOT EXISTS pull_requests (
@@ -66,13 +75,10 @@ CREATE TABLE IF NOT EXISTS stories_pull_requests (
 );
 
 CREATE TABLE IF NOT EXISTS stories_pull_request_counts (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	story_key VARCHAR(1024),
+	story_id INTEGER PRIMARY KEY,
 	pr_count INTEGER,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	-- This table uses UNIQUE(story_key), while stories uses
-	-- UNIQUE(story_key, release_id); do not define an FK to stories(story_key).
-	UNIQUE(story_key)
+	FOREIGN KEY (story_id) REFERENCES stories (id)
 );
 
 DROP VIEW IF EXISTS lead_times;
@@ -100,8 +106,10 @@ FROM
 	releases
 	JOIN projects
 	  ON releases.project_id = projects.id
+	JOIN releases_stories
+	  ON releases_stories.release_id = releases.id
 	JOIN stories
-	  ON stories.release_id = releases.id
+	  ON releases_stories.story_id = stories.id
 	JOIN stories_pull_requests
 	  ON stories_pull_requests.story_id = stories.id
 	JOIN pull_requests

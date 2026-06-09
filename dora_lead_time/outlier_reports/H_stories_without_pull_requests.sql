@@ -10,8 +10,10 @@ SELECT DISTINCT
   stories.story_title
 FROM
   stories
+  JOIN releases_stories
+    ON releases_stories.story_id = stories.id
   JOIN releases
-    ON stories.release_id = releases.id
+    ON releases_stories.release_id = releases.id
   JOIN projects
     ON releases.project_id = projects.id
   LEFT JOIN stories_pull_requests

@@ -438,10 +438,10 @@ class DatabaseProcessor:
                     releases.release_internal_id
                 FROM
                     releases
-                    LEFT JOIN stories
-                        ON releases.id = stories.release_id
+                    LEFT JOIN releases_stories
+                        ON releases.id = releases_stories.release_id
                 WHERE
-                    stories.release_id IS NULL
+                    releases_stories.story_id IS NULL
                 """
             )
 
@@ -472,26 +472,21 @@ class DatabaseProcessor:
         """Saves stories to the database.
 
         Args:
-            stories: List of story tuples to save
+            stories: List of (Story, release_internal_id) pairs to save.
+                Each Story is inserted once by story_key uniqueness, then
+                linked to its release via the releases_stories join table.
 
         Raises:
             Exception: If there's an error saving stories to the database
         """
         conn = None
         try:
-            # Create new list of tuples without the id field
-            stories = [story[1:] for story in stories]
-
-            logger.info("Saving %d stories", len(stories))
+            logger.info("Saving %d story-release pairs", len(stories))
 
             conn = self._get_connection()
             cursor = conn.cursor()
 
-            cursor.execute(
-                """
-                DROP TABLE IF EXISTS stage_stories
-                """
-            )
+            cursor.execute("DROP TABLE IF EXISTS stage_stories")
 
             cursor.execute(
                 """
@@ -500,13 +495,26 @@ class DatabaseProcessor:
                     story_key VARCHAR(1024),
                     story_title VARCHAR(1024),
                     story_type VARCHAR(1024),
-                    release_internal_id VARCHAR(1024),
                     story_created DATETIME,
                     story_resolved DATETIME,
+                    release_internal_id VARCHAR(1024),
                     UNIQUE(story_key, release_internal_id)
                 )
                 """
             )
+
+            staging_rows = [
+                (
+                    story.story_issue_id,
+                    story.story_key,
+                    story.story_title,
+                    story.story_type,
+                    story.story_created,
+                    story.story_resolved,
+                    release_internal_id,
+                )
+                for story, release_internal_id in stories
+            ]
 
             cursor.executemany(
                 """
@@ -521,9 +529,9 @@ class DatabaseProcessor:
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                stories,
+                staging_rows,
             )
-            logger.info("Staged %d stories", cursor.rowcount)
+            logger.info("Staged %d story-release pairs", cursor.rowcount)
 
             cursor.execute(
                 """
@@ -534,33 +542,47 @@ class DatabaseProcessor:
                     story_title,
                     story_type,
                     story_created,
-                    story_resolved,
-                    release_id
+                    story_resolved
                 )
-                SELECT
+                SELECT DISTINCT
                     stage_stories.story_issue_id,
                     stage_stories.story_key,
                     stage_stories.story_title,
                     stage_stories.story_type,
                     stage_stories.story_created,
-                    stage_stories.story_resolved,
-                    releases.id AS release_id
+                    stage_stories.story_resolved
                 FROM
                     stage_stories
-                JOIN releases
-                    ON (
-                        stage_stories.release_internal_id
-                        = releases.release_internal_id
-                    )
                 """
             )
-            logger.info("Inserted %d stories", cursor.rowcount)
+            logger.info("Inserted %d canonical stories", cursor.rowcount)
 
             cursor.execute(
                 """
-                DROP TABLE IF EXISTS stage_stories
+                INSERT OR IGNORE INTO releases_stories
+                (
+                    release_id,
+                    story_id
+                )
+                SELECT
+                    releases.id AS release_id,
+                    stories.id AS story_id
+                FROM
+                    stage_stories
+                    JOIN releases
+                        ON (
+                            stage_stories.release_internal_id
+                            = releases.release_internal_id
+                        )
+                    JOIN stories
+                        ON stage_stories.story_key = stories.story_key
                 """
             )
+            logger.info(
+                "Inserted %d story-release links", cursor.rowcount
+            )
+
+            cursor.execute("DROP TABLE IF EXISTS stage_stories")
 
             conn.commit()
         except (
@@ -607,19 +629,16 @@ class DatabaseProcessor:
             query = f"""
                 SELECT
                     stories.story_key,
-                    MAX(stories.story_issue_id)
-                        AS story_issue_id
+                    stories.story_issue_id
                 FROM
                     stories
                     LEFT OUTER JOIN stories_pull_request_counts
                         ON (
-                            stories.story_key
-                            = stories_pull_request_counts.story_key
+                            stories.id
+                            = stories_pull_request_counts.story_id
                         )
                 WHERE
-                    stories_pull_request_counts.story_key IS NULL
-                GROUP BY
-                    stories.story_key
+                    stories_pull_request_counts.story_id IS NULL
                 LIMIT {limit}
                 """
 
@@ -661,14 +680,12 @@ class DatabaseProcessor:
         """
         conn = None
         try:
-            # Count total PRs across all stories
-            stories_pull_request_counts = [
-                (
-                    story,
-                    len(urls)
-                )
+            # Count total PRs across all stories (keyed by story_key for now;
+            # resolved to story_id during insert below)
+            stories_pull_request_counts_by_key = {
+                story: len(urls)
                 for story, urls in stories_pull_requests_map.items()
-            ]
+            }
             stories_pull_requests = [
                 (
                     story,
@@ -777,12 +794,18 @@ class DatabaseProcessor:
             cursor.executemany(
                 """
                 INSERT OR IGNORE INTO stories_pull_request_counts (
-                    story_key,
+                    story_id,
                     pr_count
                 )
-                VALUES (?, ?)
+                SELECT stories.id, ?
+                FROM stories
+                WHERE stories.story_key = ?
                 """,
-                stories_pull_request_counts,
+                [
+                    (count, key)
+                    for key, count
+                    in stories_pull_request_counts_by_key.items()
+                ],
             )
             logger.info(
                 "Inserted %d story PR counts, "
