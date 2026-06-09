@@ -12,7 +12,12 @@ from dora_lead_time.atlassian_requests import (
     ConfigurationError,
 )
 from dora_lead_time.api_client import ApiError, AuthError, RateLimitError
-from dora_lead_time.models import Project, Release, PullRequestIdentifier
+from dora_lead_time.models import (
+    Project,
+    Release,
+    PullRequestIdentifier,
+    StoryInRelease,
+)
 
 
 class MockResponse:
@@ -390,13 +395,14 @@ def test_get_stories(mock_get, atlassian_client):
 
     # Assertions
     assert len(stories) == 3  # TEST-1 appears in both releases
+    assert all(isinstance(story, StoryInRelease) for story in stories)
 
     # Verify stories are correctly processed
-    story_keys = [s[0].story_key for s in stories]
+    story_keys = [s.story_key for s in stories]
     assert story_keys.count("TEST-1") == 2  # In both releases
     assert story_keys.count("TEST-2") == 1  # In one release
     story_internal_ids = {
-        s[0].story_key: s[0].story_internal_id for s in stories
+        s.story_key: s.story_internal_id for s in stories
     }
     assert story_internal_ids["TEST-1"] == "55501"
     assert story_internal_ids["TEST-2"] == "55502"

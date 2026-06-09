@@ -38,6 +38,19 @@ Story = namedtuple(
     ]
 )
 
+StoryInRelease = namedtuple(
+    'StoryInRelease',
+    [
+        'story_internal_id',
+        'story_key',
+        'story_title',
+        'story_type',
+        'story_created',
+        'story_resolved',
+        'release_internal_id',
+    ]
+)
+
 PullRequestIdentifier = namedtuple(
     'PullRequestIdentifier',
     [
