@@ -491,8 +491,6 @@ class AtlassianRequests:
 
             dev_data = {"detail": []}
             detail_found = False
-            last_status_code = None
-            last_response_text = ""
             for query in query_variants:
                 dev_url = (
                     "https://"
@@ -508,26 +506,15 @@ class AtlassianRequests:
                     raise_on_error=False,
                 )
 
-                last_status_code = dev_response.status_code
-                last_response_text = dev_response.text
-                if dev_response.status_code != 200:
-                    continue
+                # Only stop once pull request detail is found.
+                try:
+                    dev_data = dev_response.json()
+                except ValueError:
+                    dev_data = {"detail": []}
 
-                dev_data = dev_response.json()
                 if dev_data.get("detail"):
                     detail_found = True
                     break
-
-            if last_status_code != 200:
-                logger.error(
-                    "Error getting development info for %s: %s - %s",
-                    story,
-                    last_status_code,
-                    last_response_text,
-                )
-                failed_story_requests += 1
-                story_to_pr_urls[story] = []
-                continue
 
             if not detail_found:
                 logger.info(

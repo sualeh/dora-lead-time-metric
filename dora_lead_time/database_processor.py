@@ -591,7 +591,7 @@ class DatabaseProcessor:
 
         Args:
             limit (int, optional): Maximum number of records to retrieve.
-                Defaults to 0.
+                Defaults to PULL_REQUEST_BATCH_SIZE.
 
         Returns:
             List[tuple[str, str | None]]: (story key, story issue id)

@@ -621,6 +621,130 @@ def test_get_story_pull_requests_falls_back_to_github_default(
 
 
 @patch("requests.get")
+def test_get_story_pull_requests_continues_variants_on_non_200_without_detail(
+    mock_get, atlassian_client
+):
+    """Continue trying variants when no detail is returned, regardless of status."""
+    oauth_detail_response = {
+        "detail": [
+            {
+                "pullRequests": [
+                    {
+                        "url": "https://github.com/org/repo/pull/168",
+                    }
+                ]
+            }
+        ]
+    }
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if (
+            "rest/dev-status/latest/issue/detail" in url
+            and "applicationType=GitHub" in url
+            and "applicationId=" not in url
+        ):
+            return MockResponse({}, 500)
+        if (
+            "rest/dev-status/latest/issue/detail" in url
+            and "applicationType=oAuth-com.github.integration.production" in url
+        ):
+            return MockResponse(oauth_detail_response)
+        if "rest/dev-status/latest/issue/detail" in url:
+            return MockResponse({"detail": []})
+        return MockResponse({}, 404)
+
+    mock_get.side_effect = side_effect
+
+    story_prs = atlassian_client.get_story_pull_requests([
+        ("TEST-1", "12345")
+    ])
+
+    assert len(story_prs["TEST-1"]) == 1
+    assert story_prs["TEST-1"][0].pr_number == "168"
+
+
+@patch("requests.get")
+def test_get_story_pull_requests_stops_after_detail_found(
+    mock_get, atlassian_client
+):
+    """Stop querying variants once detail is found."""
+    github_detail_response = {
+        "detail": [
+            {
+                "pullRequests": [
+                    {
+                        "url": "https://github.com/org/repo/pull/169",
+                    }
+                ]
+            }
+        ]
+    }
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if "rest/dev-status/latest/issue/detail" in url:
+            return MockResponse(github_detail_response)
+        return MockResponse({}, 404)
+
+    mock_get.side_effect = side_effect
+
+    story_prs = atlassian_client.get_story_pull_requests([
+        ("TEST-1", "12345")
+    ])
+
+    dev_status_calls = [
+        call for call in mock_get.call_args_list
+        if "rest/dev-status/latest/issue/detail" in call.args[0]
+    ]
+    assert len(dev_status_calls) == 1
+    assert len(story_prs["TEST-1"]) == 1
+    assert story_prs["TEST-1"][0].pr_number == "169"
+
+
+@patch("requests.get")
+def test_get_story_pull_requests_all_variants_no_detail_is_not_failure(
+    mock_get, atlassian_client
+):
+    """No detail from all variants should produce an empty PR list."""
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if (
+            "rest/dev-status/latest/issue/detail" in url
+            and "applicationType=GitHub" in url
+            and "applicationId=" not in url
+        ):
+            return MockResponse({"detail": []}, 200)
+        if (
+            "rest/dev-status/latest/issue/detail" in url
+            and "applicationType=oAuth-com.github.integration.production" in url
+        ):
+            return MockResponse({}, 500)
+        if (
+            "rest/dev-status/latest/issue/detail" in url
+            and "applicationType=GitHub" in url
+            and "applicationId=oAuth-com.github.integration.production" in url
+        ):
+            return MockResponse({}, 404)
+        return MockResponse({}, 404)
+
+    mock_get.side_effect = side_effect
+
+    story_prs = atlassian_client.get_story_pull_requests([
+        ("TEST-1", "12345")
+    ])
+
+    dev_status_calls = [
+        call for call in mock_get.call_args_list
+        if "rest/dev-status/latest/issue/detail" in call.args[0]
+    ]
+    assert len(dev_status_calls) == 3
+    assert "TEST-1" in story_prs
+    assert story_prs["TEST-1"] == []
+
+
+@patch("requests.get")
 def test_get_story_pull_requests_skips_malformed_pr_url(
     mock_get, atlassian_client
 ):
