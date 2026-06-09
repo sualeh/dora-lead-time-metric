@@ -74,10 +74,9 @@ CREATE TABLE IF NOT EXISTS stories_pull_requests (
 	FOREIGN KEY (pr_id) REFERENCES pull_requests (id)
 );
 
-CREATE TABLE IF NOT EXISTS stories_pull_request_counts (
+CREATE TABLE IF NOT EXISTS stories_without_pull_requests (
 	story_id INTEGER PRIMARY KEY,
-	pr_count INTEGER,
-	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	processed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (story_id) REFERENCES stories (id)
 );
 
