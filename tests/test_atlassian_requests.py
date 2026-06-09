@@ -395,9 +395,11 @@ def test_get_stories(mock_get, atlassian_client):
     story_keys = [s[0].story_key for s in stories]
     assert story_keys.count("TEST-1") == 2  # In both releases
     assert story_keys.count("TEST-2") == 1  # In one release
-    story_issue_ids = {s[0].story_key: s[0].story_issue_id for s in stories}
-    assert story_issue_ids["TEST-1"] == "55501"
-    assert story_issue_ids["TEST-2"] == "55502"
+    story_internal_ids = {
+        s[0].story_key: s[0].story_internal_id for s in stories
+    }
+    assert story_internal_ids["TEST-1"] == "55501"
+    assert story_internal_ids["TEST-2"] == "55502"
 
     # Verify API call parameters
     call_args = mock_get.call_args

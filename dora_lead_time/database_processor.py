@@ -491,7 +491,7 @@ class DatabaseProcessor:
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS stage_stories (
-                    story_issue_id VARCHAR(1024),
+                    story_internal_id VARCHAR(1024),
                     story_key VARCHAR(1024),
                     story_title VARCHAR(1024),
                     story_type VARCHAR(1024),
@@ -505,7 +505,7 @@ class DatabaseProcessor:
 
             staging_rows = [
                 (
-                    story.story_issue_id,
+                    story.story_internal_id,
                     story.story_key,
                     story.story_title,
                     story.story_type,
@@ -519,7 +519,7 @@ class DatabaseProcessor:
             cursor.executemany(
                 """
                 INSERT INTO stage_stories (
-                    story_issue_id,
+                    story_internal_id,
                     story_key,
                     story_title,
                     story_type,
@@ -537,7 +537,7 @@ class DatabaseProcessor:
                 """
                 INSERT OR IGNORE INTO stories
                 (
-                    story_issue_id,
+                    story_internal_id,
                     story_key,
                     story_title,
                     story_type,
@@ -545,7 +545,7 @@ class DatabaseProcessor:
                     story_resolved
                 )
                 SELECT DISTINCT
-                    stage_stories.story_issue_id,
+                    stage_stories.story_internal_id,
                     stage_stories.story_key,
                     stage_stories.story_title,
                     stage_stories.story_type,
@@ -616,7 +616,7 @@ class DatabaseProcessor:
                 Defaults to PULL_REQUEST_BATCH_SIZE.
 
         Returns:
-            List[tuple[str, str | None]]: (story key, story issue id)
+            List[tuple[str, str | None]]: (story key, story internal id)
                 pairs that don't have pull requests mapped to them.
 
         Raises:
@@ -629,7 +629,7 @@ class DatabaseProcessor:
             query = f"""
                 SELECT
                     stories.story_key,
-                    stories.story_issue_id
+                    stories.story_internal_id
                 FROM
                     stories
                     LEFT OUTER JOIN stories_pull_request_counts

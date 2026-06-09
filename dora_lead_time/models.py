@@ -29,7 +29,7 @@ Story = namedtuple(
     'Story',
     [
         'id',
-        'story_issue_id',
+        'story_internal_id',
         'story_key',
         'story_title',
         'story_type',

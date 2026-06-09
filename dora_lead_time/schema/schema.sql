@@ -23,14 +23,14 @@ CREATE TABLE IF NOT EXISTS releases (
 
 CREATE TABLE IF NOT EXISTS stories (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	story_issue_id VARCHAR(1024),
+	story_internal_id VARCHAR(1024),
 	story_key VARCHAR(1024),
 	story_title VARCHAR(1024),
 	story_type VARCHAR(1024),
 	story_created DATETIME,
 	story_resolved DATETIME,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	UNIQUE(story_issue_id),
+	UNIQUE(story_internal_id),
 	UNIQUE(story_key)
 );
 
