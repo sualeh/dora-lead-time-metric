@@ -24,8 +24,10 @@ WITH project_story_counts AS (
     projects
     LEFT JOIN releases
       ON projects.id = releases.project_id
+    LEFT JOIN releases_stories
+      ON releases.id = releases_stories.release_id
     LEFT JOIN stories
-      ON releases.id = stories.release_id
+      ON releases_stories.story_id = stories.id
     LEFT JOIN stories_pull_requests
       ON stories.id = stories_pull_requests.story_id
     LEFT JOIN pull_requests

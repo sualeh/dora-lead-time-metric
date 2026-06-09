@@ -35,7 +35,6 @@ Story = namedtuple(
         'story_type',
         'story_created',
         'story_resolved',
-        'release_id'
     ]
 )
 

@@ -14,8 +14,10 @@ FROM
     ON pull_requests.id = stories_pull_requests.pr_id
   JOIN stories
     ON stories_pull_requests.story_id = stories.id
+  JOIN releases_stories
+    ON releases_stories.story_id = stories.id
   JOIN releases
-    ON stories.release_id = releases.id
+    ON releases_stories.release_id = releases.id
   JOIN projects
     ON releases.project_id = projects.id
 WHERE

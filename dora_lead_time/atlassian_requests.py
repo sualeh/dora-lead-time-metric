@@ -287,16 +287,17 @@ class AtlassianRequests:
 
     def get_stories(
         self, releases: list[str],
-    ) -> List[Story]:
+    ) -> List[tuple]:
         """Retrieve stories by fix version IDs from Jira.
 
         Args:
             releases: List of Jira fix version IDs as strings
 
         Returns:
-            List[Story]: List of Story named tuples containing:
-            (story_key, story_title, story_type, story_created, story_resolved,
-            release_id)
+            List[tuple]: List of (Story, release_internal_id) pairs where
+            Story contains (story_key, story_title, story_type,
+            story_created, story_resolved) and release_internal_id is the
+            Jira fix version ID that links the story to a release.
 
         Raises:
             TypeError: If releases parameter is not a list or does not
@@ -382,9 +383,8 @@ class AtlassianRequests:
                             story_type=issue["fields"]["issuetype"]["name"],
                             story_created=created,
                             story_resolved=resolved,
-                            release_id=release["id"],
                         )
-                        all_stories.append(story_details)
+                        all_stories.append((story_details, release["id"]))
 
             # Move to next batch
             issues_processed += len(data["issues"])
@@ -392,9 +392,9 @@ class AtlassianRequests:
                 textwrap.dedent("""
                     Retrieved %d issues in current batch
                     Issues processed so far: %d
-                    (Story row counts may not match unique issues if they are
-                    part of more than one release)
-                    Total story rows retrieved: %d
+                    (Story-release pair count may exceed unique issues
+                    when stories belong to more than one release)
+                    Total story-release pairs retrieved: %d
                 """).strip(),
                 len(data["issues"]),
                 issues_processed,

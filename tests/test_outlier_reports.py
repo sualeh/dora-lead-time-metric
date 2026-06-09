@@ -55,25 +55,39 @@ def seeded_db_path(tmp_path) -> str:
     cursor.executemany(
         """
         INSERT INTO stories (id, story_issue_id, story_key, story_title,
-                             story_type, story_created, story_resolved,
-                             release_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                             story_type, story_created, story_resolved)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         [
             (1, "JIRA-1", "B-1", "Open Story At Release", "Story",
-             _iso(20), _iso(5), 1),
+             _iso(20), _iso(5)),
             (2, "JIRA-2", "DUP-1", "Duplicate Story", "Story",
-             _iso(15), _iso(9), 1),
-            (3, "JIRA-3", "DUP-1", "Duplicate Story", "Story",
-             _iso(10), _iso(4), 2),
-            (4, "JIRA-4", "NOPR-1", "No PR Story", "Story",
-             _iso(12), _iso(8), 1),
-            (5, "JIRA-5", "OPENPR-1", "Open PR On Release", "Story",
-             _iso(15), _iso(9), 1),
-            (6, "JIRA-6", "OLDCOMMIT-1", "Old Commit Story", "Story",
-             _iso(12), _iso(4), 2),
-            (7, "JIRA-7", "NEG-1", "Negative Lead Story", "Story",
-             _iso(10), _iso(4), 2),
+             _iso(15), _iso(9)),
+            (3, "JIRA-4", "NOPR-1", "No PR Story", "Story",
+             _iso(12), _iso(8)),
+            (4, "JIRA-5", "OPENPR-1", "Open PR On Release", "Story",
+             _iso(15), _iso(9)),
+            (5, "JIRA-6", "OLDCOMMIT-1", "Old Commit Story", "Story",
+             _iso(12), _iso(4)),
+            (6, "JIRA-7", "NEG-1", "Negative Lead Story", "Story",
+             _iso(10), _iso(4)),
+        ],
+    )
+
+    # DUP-1 belongs to both Release 1 and Release 2 (many-to-many)
+    cursor.executemany(
+        """
+        INSERT INTO releases_stories (story_id, release_id)
+        VALUES (?, ?)
+        """,
+        [
+            (1, 1),  # B-1 → Release Recent 1
+            (2, 1),  # DUP-1 → Release Recent 1
+            (2, 2),  # DUP-1 → Release Recent 2  (multi-release)
+            (3, 1),  # NOPR-1 → Release Recent 1
+            (4, 1),  # OPENPR-1 → Release Recent 1
+            (5, 2),  # OLDCOMMIT-1 → Release Recent 2
+            (6, 2),  # NEG-1 → Release Recent 2
         ],
     )
 
@@ -100,9 +114,9 @@ def seeded_db_path(tmp_path) -> str:
         VALUES (?, ?)
         """,
         [
-            (5, 1),
-            (6, 2),
-            (7, 3),
+            (4, 1),
+            (5, 2),
+            (6, 3),
         ],
     )
 

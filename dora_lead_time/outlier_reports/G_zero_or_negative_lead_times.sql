@@ -21,8 +21,10 @@ FROM
   releases
   JOIN projects
     ON releases.project_id = projects.id
+  JOIN releases_stories
+    ON releases_stories.release_id = releases.id
   JOIN stories
-    ON stories.release_id = releases.id
+    ON releases_stories.story_id = stories.id
   JOIN stories_pull_requests
     ON stories_pull_requests.story_id = stories.id
   JOIN pull_requests

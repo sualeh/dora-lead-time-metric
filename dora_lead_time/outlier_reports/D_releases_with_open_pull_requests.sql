@@ -16,8 +16,10 @@ SELECT DISTINCT
     AS pr_close
 FROM
   stories
+  JOIN releases_stories
+    ON releases_stories.story_id = stories.id
   JOIN releases
-    ON stories.release_id = releases.id
+    ON releases_stories.release_id = releases.id
   JOIN stories_pull_requests
     ON stories_pull_requests.story_id = stories.id
   JOIN pull_requests

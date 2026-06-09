@@ -14,8 +14,10 @@ SELECT
     AS story_resolved
 FROM
   stories
+  JOIN releases_stories
+    ON releases_stories.story_id = stories.id
   JOIN releases
-    ON stories.release_id = releases.id
+    ON releases_stories.release_id = releases.id
 WHERE
   -- +3: 3-day grace period — stories may legitimately resolve shortly
   -- after a release during a stabilization window.
