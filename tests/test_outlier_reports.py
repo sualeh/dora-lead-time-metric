@@ -175,9 +175,9 @@ def test_report_releases_modified_after_release_date(reports):
     assert int(row["days_after_release"]) > 0
 
 
-def test_report_stories_in_multiple_releases(reports):
-    """Stories included in more than one release should be reported."""
-    result = reports.report_stories_in_multiple_releases()
+def test_report_releases_with_shared_stories(reports):
+    """Shared stories across releases should be reported."""
+    result = reports.report_releases_with_shared_stories()
 
     assert not result.empty
     assert "story_key" in result.columns

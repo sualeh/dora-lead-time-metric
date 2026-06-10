@@ -155,17 +155,16 @@ class OutlierReports:
         sql = self._read_sql_file("E_releases_modified_after_release_date")
         return self.execute_query(sql)
 
-    def report_stories_in_multiple_releases(self) -> pd.DataFrame:
-        """Get stories that appear in multiple releases.
+    def report_releases_with_shared_stories(self) -> pd.DataFrame:
+        """Get releases that share the same stories.
 
         Identifies stories that are counted in more than one release, which
-        could skew lead time metrics or indicate process issues.
+        can indicate shared scope across releases and skew lead time metrics.
 
         Returns:
-            DataFrame of stories included in more than one release,
-            with details about which releases they appear in.
+            DataFrame of shared stories and the releases they appear in.
         """
-        sql = self._read_sql_file("G_stories_in_multiple_releases")
+        sql = self._read_sql_file("F_releases_with_shared_stories")
         return self.execute_query(sql)
 
     def report_releases_with_open_pull_requests(self) -> pd.DataFrame:
@@ -221,7 +220,7 @@ class OutlierReports:
             DataFrame with pull requests where commits are significantly older
             than the PR creation date, ordered by the age difference.
         """
-        sql = self._read_sql_file("F_pull_requests_with_old_commits")
+        sql = self._read_sql_file("G_pull_requests_with_old_commits")
         return self.execute_query(sql)
 
     def report_zero_or_negative_lead_times(self) -> pd.DataFrame:
