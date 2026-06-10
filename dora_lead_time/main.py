@@ -140,10 +140,6 @@ def create_releases_database(config: LeadTimeConfiguration):
         config.end_date,
         projects=projects,
     )
-    release_titles_by_id = {
-        release.release_internal_id: release.release_title
-        for release in releases
-    }
     db_processor.save_releases(releases)
     db_processor.print_summary()
 
@@ -156,37 +152,20 @@ def create_releases_database(config: LeadTimeConfiguration):
         stories_saved = 0
         for release_id in release_ids:
             stories = atlassian_client.get_stories([release_id])
-            release_title = release_titles_by_id.get(release_id)
             if not stories:
-                if release_title:
-                    logger.info(
-                        "No stories found for release %s (%s)",
-                        release_id,
-                        release_title,
-                    )
-                else:
-                    logger.info(
-                        "No stories found for release %s", release_id
-                    )
+                logger.info(
+                    "No stories found for release %s", release_id
+                )
                 continue
 
             db_processor.save_stories(stories)
             stories_saved += len(stories)
-            if release_title:
-                logger.info(
-                    "Saved %d stories for release %s (%s) (%d total so far)",
-                    len(stories),
-                    release_id,
-                    release_title,
-                    stories_saved,
-                )
-            else:
-                logger.info(
-                    "Saved %d stories for release %s (%d total so far)",
-                    len(stories),
-                    release_id,
-                    stories_saved,
-                )
+            logger.info(
+                "Saved %d stories for release %s (%d total so far)",
+                len(stories),
+                release_id,
+                stories_saved,
+            )
     db_processor.print_summary()
 
     # Step 5: Find stories without pull requests, get PRs and save them
