@@ -71,6 +71,8 @@ def seeded_db_path(tmp_path) -> str:
              _iso(12), _iso(4)),
             (6, "JIRA-7", "NEG-1", "Negative Lead Story", "Story",
              _iso(10), _iso(4)),
+            (7, "JIRA-8", "POSTREL-1", "Story Created After Release",
+             "Story", _iso(8), _iso(7)),
         ],
     )
 
@@ -88,6 +90,7 @@ def seeded_db_path(tmp_path) -> str:
             (4, 1),  # OPENPR-1 → Release Recent 1
             (5, 2),  # OLDCOMMIT-1 → Release Recent 2
             (6, 2),  # NEG-1 → Release Recent 2
+            (7, 1),  # POSTREL-1 → Release Recent 1 after release date
         ],
     )
 
@@ -161,9 +164,20 @@ def test_report_releases_with_open_stories(reports):
     assert "B-1" in set(result["story_key"])
 
 
-def test_report_stories_in_multiple_releases(reports):
-    """Stories included in more than one release should be reported."""
-    result = reports.report_stories_in_multiple_releases()
+def test_report_releases_modified_after_release_date(reports):
+    """Stories created after release should be reported."""
+    result = reports.report_releases_modified_after_release_date()
+
+    assert not result.empty
+    assert "story_key" in result.columns
+    assert "days_after_release" in result.columns
+    row = result[result["story_key"] == "POSTREL-1"].iloc[0]
+    assert int(row["days_after_release"]) > 0
+
+
+def test_report_releases_with_shared_stories(reports):
+    """Shared stories across releases should be reported."""
+    result = reports.report_releases_with_shared_stories()
 
     assert not result.empty
     assert "story_key" in result.columns
@@ -246,6 +260,21 @@ def test_report_zero_or_negative_lead_times(reports):
     assert "lead_time" in result.columns
     row = result[result["story_key"] == "NEG-1"].iloc[0]
     assert float(row["lead_time"]) <= 0
+
+
+def test_report_releases_without_stories(reports):
+    """Releases with no stories should be reported."""
+    result = reports.report_releases_without_stories()
+
+    assert not result.empty
+    assert {
+        "release_internal_id",
+        "release_title",
+        "release_date",
+        "project_key",
+        "project_title",
+    }.issubset(result.columns)
+    assert "R-3" in set(result["release_internal_id"])
 
 
 def test_read_sql_file_raises_for_missing_file(reports):
