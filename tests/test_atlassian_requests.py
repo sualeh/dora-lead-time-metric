@@ -2,11 +2,10 @@
 
 import os
 import pytest
-import unittest.mock as mock
-import json
 from datetime import date, datetime
 from unittest.mock import patch, MagicMock
 
+from tests.helpers import MockResponse
 from dora_lead_time.atlassian_requests import (
     AtlassianRequests,
     ConfigurationError,
@@ -18,25 +17,6 @@ from dora_lead_time.models import (
     PullRequestIdentifier,
     StoryInRelease,
 )
-
-
-class MockResponse:
-    """Mock response for requests."""
-
-    def __init__(self, json_data, status_code=200, headers=None):
-        self.json_data = json_data
-        self.status_code = status_code
-        self.text = json.dumps(json_data)
-        self.headers = headers or {}
-
-    def json(self):
-        """Return JSON data."""
-        return self.json_data
-
-    def raise_for_status(self):
-        """Raise exception if status code is not 200."""
-        if self.status_code != 200:
-            raise Exception(f"API request failed with status {self.status_code}")
 
 
 @pytest.fixture
@@ -142,18 +122,6 @@ def test_get_projects(mock_get, atlassian_client):
         params=None,
         timeout=30,
     )
-
-
-@patch("requests.get")
-def test_get_projects_raises_auth_error_when_zero_projects_and_unauthorized(
-    mock_get, atlassian_client
-):
-    """Fail fast when Jira projects endpoint returns 401/403."""
-
-    mock_get.return_value = MockResponse({}, status_code=401)
-
-    with pytest.raises(AuthError, match="Authentication failed"):
-        atlassian_client.get_projects()
 
 
 @patch("requests.get")
@@ -804,30 +772,19 @@ def test_get_story_pull_requests_error_handling(mock_get, atlassian_client):
     assert len(story_prs["TEST-1"]) == 0
 
 
-def test_get_stories_validation():
+def test_get_stories_validation(atlassian_client):
     """Test input validation for get_stories method."""
-    with patch("requests.get") as mock_get:
-        mock_get.return_value = MockResponse({"accountId": "12345"})
-        client = AtlassianRequests(
-            jira_instance="test.atlassian.net",
-            email="test@example.com"
-        )
-
-    # Test with non-list input
     with pytest.raises(TypeError):
-        client.get_stories("not-a-list")
+        atlassian_client.get_stories("not-a-list")
 
-    # Test with empty list
     with pytest.raises(ValueError):
-        client.get_stories([])
+        atlassian_client.get_stories([])
 
-    # Test with non-string items
     with pytest.raises(TypeError):
-        client.get_stories([123, 456])
+        atlassian_client.get_stories([123, 456])
 
-    # Test with empty string items
     with pytest.raises(ValueError):
-        client.get_stories(["valid", ""])
+        atlassian_client.get_stories(["valid", ""])
 
 
 @pytest.mark.parametrize("status_code", [401, 403])
@@ -838,29 +795,6 @@ def test_get_projects_auth_error(mock_get, status_code, atlassian_client):
 
     with pytest.raises(AuthError):
         atlassian_client.get_projects()
-
-
-@pytest.mark.parametrize("status_code", [401, 403])
-@patch("requests.get")
-def test_get_releases_auth_error(mock_get, status_code, atlassian_client):
-    """Test that 401/403 on versions request in get_releases raises AuthError."""
-    mock_get.return_value = MockResponse({}, status_code)
-    projects = [
-        Project(
-            id=None,
-            project_internal_id="10000",
-            project_key="TEST",
-            project_title="Test",
-            project_type="software",
-        )
-    ]
-
-    with pytest.raises(AuthError):
-        atlassian_client.get_releases(
-            start_date=__import__("datetime").date(2023, 1, 1),
-            end_date=__import__("datetime").date(2023, 12, 31),
-            projects=projects,
-        )
 
 
 @pytest.mark.parametrize("status_code", [401, 403])
@@ -882,8 +816,8 @@ def test_get_releases_versions_auth_error(
 
     with pytest.raises(AuthError):
         atlassian_client.get_releases(
-            start_date=__import__("datetime").date(2023, 1, 1),
-            end_date=__import__("datetime").date(2023, 12, 31),
+            start_date=date(2023, 1, 1),
+            end_date=date(2023, 12, 31),
             projects=projects,
         )
 
@@ -900,19 +834,7 @@ def test_get_stories_auth_error(mock_get, status_code, atlassian_client):
 
 @pytest.mark.parametrize("status_code", [401, 403])
 @patch("requests.get")
-def test_get_story_pull_requests_issue_auth_error(
-    mock_get, status_code, atlassian_client
-):
-    """Test that 401/403 on dev-status in get_story_pull_requests raises AuthError."""
-    mock_get.return_value = MockResponse({}, status_code)
-
-    with pytest.raises(AuthError):
-        atlassian_client.get_story_pull_requests([("TEST-1", "12345")])
-
-
-@pytest.mark.parametrize("status_code", [401, 403])
-@patch("requests.get")
-def test_get_story_pull_requests_dev_auth_error(
+def test_get_story_pull_requests_auth_error(
     mock_get, status_code, atlassian_client
 ):
     """Test that 401/403 on dev-status in get_story_pull_requests raises AuthError."""
@@ -941,22 +863,11 @@ def test_get_stories_rate_limit_error(mock_get, atlassian_client):
 
 
 @patch("requests.get")
-def test_get_story_pull_requests_issue_rate_limit_error(
+def test_get_story_pull_requests_rate_limit_error(
     mock_get, atlassian_client
 ):
     """Test that a 429 on dev-status raises RateLimitError."""
     mock_get.return_value = MockResponse({}, 429)
-    with pytest.raises(RateLimitError):
-        atlassian_client.get_story_pull_requests([("TEST-1", "12345")])
-
-
-@patch("requests.get")
-def test_get_story_pull_requests_dev_rate_limit_error(
-    mock_get, atlassian_client
-):
-    """Test that a 429 on dev-status raises RateLimitError."""
-    mock_get.return_value = MockResponse({}, 429)
-
     with pytest.raises(RateLimitError):
         atlassian_client.get_story_pull_requests([("TEST-1", "12345")])
 
@@ -987,8 +898,8 @@ def test_get_releases_structural_api_error(
         )
     ]
     releases = atlassian_client.get_releases(
-        start_date=__import__("datetime").date(2023, 1, 1),
-        end_date=__import__("datetime").date(2023, 12, 31),
+        start_date=date(2023, 1, 1),
+        end_date=date(2023, 12, 31),
         projects=projects,
     )
     assert releases == []
@@ -1001,26 +912,3 @@ def test_get_stories_api_error(mock_get, status_code, atlassian_client):
     mock_get.return_value = MockResponse({}, status_code)
     with pytest.raises(ApiError):
         atlassian_client.get_stories(["10000"])
-
-
-@patch("requests.get")
-def test_get_releases_versions_non_200_skips(mock_get, atlassian_client):
-    """Test that per-project versions errors are skipped, not raised."""
-    projects = [
-        Project(
-            id=None,
-            project_internal_id="10000",
-            project_key="TEST",
-            project_title="Test",
-            project_type="software",
-        )
-    ]
-    mock_get.return_value = MockResponse({}, 404)
-
-    # Should return empty list, not raise
-    releases = atlassian_client.get_releases(
-        start_date=__import__("datetime").date(2023, 1, 1),
-        end_date=__import__("datetime").date(2023, 12, 31),
-        projects=projects,
-    )
-    assert releases == []
