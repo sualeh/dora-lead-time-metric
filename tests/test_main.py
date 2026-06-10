@@ -61,6 +61,9 @@ def test_save_outlier_reports_uses_requested_order(tmp_path, monkeypatch):
         def report_counts_of_stories_without_pull_requests(self):
             return self._df("counts_of_stories_without_pull_requests")
 
+        def report_releases_without_stories(self):
+            return self._df("releases_without_stories")
+
     monkeypatch.setattr(main, "OutlierReports", FakeOutlierReports)
     monkeypatch.setattr(main, "datetime", _FakeDateTime)
     monkeypatch.chdir(tmp_path)
@@ -86,6 +89,7 @@ def test_save_outlier_reports_uses_requested_order(tmp_path, monkeypatch):
         "pull_requests_in_multiple_stories",
         "stories_without_pull_requests",
         "counts_of_stories_without_pull_requests",
+        "releases_without_stories",
     ]
 
     assert call_order == expected_order

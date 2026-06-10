@@ -251,6 +251,19 @@ class OutlierReports:
         sql = self._read_sql_file("H_pull_requests_in_multiple_stories")
         return self.execute_query(sql)
 
+    def report_releases_without_stories(self) -> pd.DataFrame:
+        """Get releases that do not have any linked stories.
+
+        Identifies releases missing story associations, which can indicate
+        incomplete data ingestion or release records that need follow-up.
+
+        Returns:
+            DataFrame of releases with no linked stories, including project
+            details.
+        """
+        sql = self._read_sql_file("J_releases_without_stories")
+        return self.execute_query(sql)
+
 
 def main():
     """Main entry point of the application."""

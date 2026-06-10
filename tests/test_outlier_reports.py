@@ -262,6 +262,21 @@ def test_report_zero_or_negative_lead_times(reports):
     assert float(row["lead_time"]) <= 0
 
 
+def test_report_releases_without_stories(reports):
+    """Releases with no stories should be reported."""
+    result = reports.report_releases_without_stories()
+
+    assert not result.empty
+    assert {
+        "release_internal_id",
+        "release_title",
+        "release_date",
+        "project_key",
+        "project_title",
+    }.issubset(result.columns)
+    assert "R-3" in set(result["release_internal_id"])
+
+
 def test_read_sql_file_raises_for_missing_file(reports):
     """Missing SQL files should raise FileNotFoundError."""
     with pytest.raises(FileNotFoundError):

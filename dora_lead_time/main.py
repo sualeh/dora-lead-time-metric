@@ -276,7 +276,9 @@ def save_outlier_reports(config: LeadTimeConfiguration):
         "stories_without_pull_requests":
             outlier_reports.report_stories_without_pull_requests,
         "counts_of_stories_without_pull_requests":
-            outlier_reports.report_counts_of_stories_without_pull_requests
+            outlier_reports.report_counts_of_stories_without_pull_requests,
+        "releases_without_stories":
+            outlier_reports.report_releases_without_stories
     }
 
     # Generate and save each report
