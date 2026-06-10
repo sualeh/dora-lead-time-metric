@@ -715,13 +715,13 @@ class DatabaseProcessor:
             conn = self._get_connection()
             cursor = conn.cursor()
 
-            if stories_pull_requests:
-                cursor.execute(
-                    """
-                    DROP TABLE IF EXISTS stage_stories_pull_requests
-                    """
-                )
+            cursor.execute(
+                """
+                DROP TABLE IF EXISTS stage_stories_pull_requests
+                """
+            )
 
+            if stories_pull_requests:
                 cursor.execute(
                     """
                     CREATE TABLE IF NOT EXISTS stage_stories_pull_requests (

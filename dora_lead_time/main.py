@@ -158,22 +158,35 @@ def create_releases_database(config: LeadTimeConfiguration):
             stories = atlassian_client.get_stories([release_id])
             release_title = release_titles_by_id.get(release_id)
             if not stories:
-                logger.info(
-                    "No stories found for release %s%s",
-                    release_id,
-                    f" ({release_title})" if release_title else "",
-                )
+                if release_title:
+                    logger.info(
+                        "No stories found for release %s (%s)",
+                        release_id,
+                        release_title,
+                    )
+                else:
+                    logger.info(
+                        "No stories found for release %s", release_id
+                    )
                 continue
 
             db_processor.save_stories(stories)
             stories_saved += len(stories)
-            logger.info(
-                "Saved %d stories for release %s%s (%d total so far)",
-                len(stories),
-                release_id,
-                f" ({release_title})" if release_title else "",
-                stories_saved,
-            )
+            if release_title:
+                logger.info(
+                    "Saved %d stories for release %s (%s) (%d total so far)",
+                    len(stories),
+                    release_id,
+                    release_title,
+                    stories_saved,
+                )
+            else:
+                logger.info(
+                    "Saved %d stories for release %s (%d total so far)",
+                    len(stories),
+                    release_id,
+                    stories_saved,
+                )
     db_processor.print_summary()
 
     # Step 5: Find stories without pull requests, get PRs and save them
