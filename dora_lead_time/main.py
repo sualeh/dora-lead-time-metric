@@ -154,14 +154,14 @@ def create_releases_database(config: LeadTimeConfiguration):
             stories = atlassian_client.get_stories([release_id])
             if not stories:
                 logger.info(
-                    "No stories found for release %s", release_id
+                    "-- 4. No stories found for release %s", release_id
                 )
                 continue
 
             db_processor.save_stories(stories)
             stories_saved += len(stories)
             logger.info(
-                "Saved %d stories for release %s (%d total so far)",
+                "-- 4. Saved %d stories for release %s (%d total so far)",
                 len(stories),
                 release_id,
                 stories_saved,
@@ -179,7 +179,7 @@ def create_releases_database(config: LeadTimeConfiguration):
         if story_records:
             pr_lookup_iteration += 1
             logger.info(
-                "Pull requests iteration %d: "
+                "-- 5. Pull requests iteration %d: "
                 "getting pull requests for %d stories",
                 pr_lookup_iteration,
                 len(story_records)
@@ -191,7 +191,7 @@ def create_releases_database(config: LeadTimeConfiguration):
 
             if pr_lookup_iteration % PROGRESS_CHECKPOINT_INTERVAL == 0:
                 logger.info(
-                    "Pull requests checkpoint at iteration %d: "
+                    "-- 5. Pull requests checkpoint at iteration %d: "
                     "printing database summary",
                     pr_lookup_iteration,
                 )
@@ -211,7 +211,7 @@ def create_releases_database(config: LeadTimeConfiguration):
         if pull_requests:
             pr_details_iteration += 1
             logger.info(
-                "Pull requests details iteration %d: "
+                "-- 6. Pull requests details iteration %d: "
                 "getting details for %d pull requests",
                 pr_details_iteration,
                 len(pull_requests)
@@ -221,7 +221,7 @@ def create_releases_database(config: LeadTimeConfiguration):
 
             if pr_details_iteration % PROGRESS_CHECKPOINT_INTERVAL == 0:
                 logger.info(
-                    "Pull requests details checkpoint at iteration %d: "
+                    "-- 6. Pull requests details checkpoint at iteration %d: "
                     "printing database summary",
                     pr_details_iteration,
                 )
