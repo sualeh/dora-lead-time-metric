@@ -265,6 +265,8 @@ def save_outlier_reports(config: LeadTimeConfiguration):
             outlier_reports.report_releases_with_open_pull_requests,
         "releases_with_open_stories":
             outlier_reports.report_releases_with_open_stories,
+        "releases_modified_after_release_date":
+            outlier_reports.report_releases_modified_after_release_date,
         "pull_requests_with_old_commits":
             outlier_reports.report_pull_requests_with_old_commits,
         "stories_in_multiple_releases":

@@ -43,6 +43,9 @@ def test_save_outlier_reports_uses_requested_order(tmp_path, monkeypatch):
         def report_releases_with_open_stories(self):
             return self._df("releases_with_open_stories")
 
+        def report_releases_modified_after_release_date(self):
+            return self._df("releases_modified_after_release_date")
+
         def report_pull_requests_with_old_commits(self):
             return self._df("pull_requests_with_old_commits")
 
@@ -77,6 +80,7 @@ def test_save_outlier_reports_uses_requested_order(tmp_path, monkeypatch):
         "zero_or_negative_lead_times",
         "releases_with_open_pull_requests",
         "releases_with_open_stories",
+        "releases_modified_after_release_date",
         "pull_requests_with_old_commits",
         "stories_in_multiple_releases",
         "pull_requests_in_multiple_stories",

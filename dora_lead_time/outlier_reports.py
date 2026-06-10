@@ -142,6 +142,19 @@ class OutlierReports:
         sql = self._read_sql_file("D_releases_with_open_stories")
         return self.execute_query(sql)
 
+    def report_releases_modified_after_release_date(self) -> pd.DataFrame:
+        """Get release stories created after the release date.
+
+        Identifies stories attached to a release even though the story was
+        created after the release date, which indicates a timeline anomaly.
+
+        Returns:
+            DataFrame of release-story pairs where the story creation date is
+            after the release date, including the number of days after.
+        """
+        sql = self._read_sql_file("E_releases_modified_after_release_date")
+        return self.execute_query(sql)
+
     def report_stories_in_multiple_releases(self) -> pd.DataFrame:
         """Get stories that appear in multiple releases.
 
@@ -152,7 +165,7 @@ class OutlierReports:
             DataFrame of stories included in more than one release,
             with details about which releases they appear in.
         """
-        sql = self._read_sql_file("F_stories_in_multiple_releases")
+        sql = self._read_sql_file("G_stories_in_multiple_releases")
         return self.execute_query(sql)
 
     def report_releases_with_open_pull_requests(self) -> pd.DataFrame:
@@ -180,7 +193,7 @@ class OutlierReports:
             grouped by project and story type, including percentage
             calculations.
         """
-        sql = self._read_sql_file("H_counts_of_stories_without_pull_requests")
+        sql = self._read_sql_file("I_counts_of_stories_without_pull_requests")
         return self.execute_query(sql)
 
     def report_stories_without_pull_requests(self) -> pd.DataFrame:
@@ -194,7 +207,7 @@ class OutlierReports:
             DataFrame with detailed information about stories that don't have
             pull requests linked to them, including story type.
         """
-        sql = self._read_sql_file("H_stories_without_pull_requests")
+        sql = self._read_sql_file("I_stories_without_pull_requests")
         return self.execute_query(sql)
 
     def report_pull_requests_with_old_commits(self) -> pd.DataFrame:
@@ -208,7 +221,7 @@ class OutlierReports:
             DataFrame with pull requests where commits are significantly older
             than the PR creation date, ordered by the age difference.
         """
-        sql = self._read_sql_file("E_pull_requests_with_old_commits")
+        sql = self._read_sql_file("F_pull_requests_with_old_commits")
         return self.execute_query(sql)
 
     def report_zero_or_negative_lead_times(self) -> pd.DataFrame:
@@ -236,7 +249,7 @@ class OutlierReports:
             DataFrame with pull request identifiers and the count of
             distinct linked stories.
         """
-        sql = self._read_sql_file("G_pull_requests_in_multiple_stories")
+        sql = self._read_sql_file("H_pull_requests_in_multiple_stories")
         return self.execute_query(sql)
 
 
