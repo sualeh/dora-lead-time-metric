@@ -2,28 +2,13 @@
 
 import os
 import pytest
-import unittest.mock as mock
-import json
 from datetime import date, datetime
 from unittest.mock import patch, MagicMock
 
+from tests.helpers import MockResponse
 from dora_lead_time.github_requests import GitHubRequests
 from dora_lead_time.api_client import AuthError, RateLimitError
 from dora_lead_time.models import PullRequestIdentifier, PullRequest
-
-
-class MockResponse:
-    """Mock response for requests."""
-
-    def __init__(self, json_data, status_code=200, headers=None):
-        self.json_data = json_data
-        self.status_code = status_code
-        self.text = json.dumps(json_data)
-        self.headers = headers or {}
-
-    def json(self):
-        """Return JSON data."""
-        return self.json_data
 
 
 @pytest.fixture

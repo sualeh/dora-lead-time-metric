@@ -1,73 +1,55 @@
-import os
+"""Unit tests for LeadTimeReport and LeadTimeResult."""
+
 import pytest
-import tempfile
 from unittest.mock import patch, MagicMock
 from datetime import date
 import pandas as pd
 import matplotlib.pyplot as plt
 import sqlite3
-from pathlib import Path
 
 from dora_lead_time.lead_time_report import LeadTimeReport, LeadTimeResult
 
 
-@pytest.fixture
-def temp_db_file():
-    """Fixture to create a temporary database file."""
-    # Create a temporary file
-    with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as temp_file:
-        db_path = temp_file.name
-
-    # Make sure the file exists for the test
-    Path(db_path).touch()
-
-    yield db_path
-
-    # Cleanup the temporary file
-    if os.path.exists(db_path):
-        os.remove(db_path)
-
-
-def test_init(temp_db_file):
-    # Test initialization with explicit path
-    report = LeadTimeReport(temp_db_file)
-    assert report.sqlite_path == temp_db_file
+def test_init(tmp_path):
+    """Test initialization stores sqlite_path."""
+    db_path = tmp_path / "test.db"
+    db_path.touch()
+    report = LeadTimeReport(str(db_path))
+    assert report.sqlite_path == str(db_path)
 
 
 @patch('sqlite3.connect')
-def test_get_connection(mock_connect, temp_db_file):
-    # Setup mock connection
+def test_get_connection(mock_connect, tmp_path):
+    """Test that _get_connection calls sqlite3.connect."""
     mock_conn = MagicMock()
     mock_connect.return_value = mock_conn
 
-    # Call the method
-    report = LeadTimeReport(temp_db_file)
+    db_path = tmp_path / "test.db"
+    db_path.touch()
+    report = LeadTimeReport(str(db_path))
     conn = report._get_connection()
 
-    # Check if connect was called
     mock_connect.assert_called_once()
     assert conn == mock_conn
 
 
 @patch('sqlite3.connect')
-def test_calculate_lead_time(mock_connect, temp_db_file):
-    # Setup mock cursor and connection
+def test_calculate_lead_time(mock_connect, tmp_path):
+    """Test calculate_lead_time returns a populated LeadTimeResult."""
     mock_cursor = MagicMock()
     mock_conn = MagicMock()
     mock_conn.cursor.return_value = mock_cursor
     mock_connect.return_value = mock_conn
-
-    # Setup mock query result
     mock_cursor.fetchall.return_value = [(10.5, 5)]
 
-    # Call the method
-    report = LeadTimeReport(temp_db_file)
+    db_path = tmp_path / "test.db"
+    db_path.touch()
+    report = LeadTimeReport(str(db_path))
     project_keys = ["TEST1", "TEST2"]
     start_date = date(2023, 1, 1)
     end_date = date(2023, 12, 31)
     result = report.calculate_lead_time(project_keys, start_date, end_date)
 
-    # Verify the result
     assert isinstance(result, LeadTimeResult)
     assert result.average_lead_time == 10.5
     assert result.number_of_releases == 5
@@ -77,26 +59,24 @@ def test_calculate_lead_time(mock_connect, temp_db_file):
 
 
 @patch('sqlite3.connect')
-def test_calculate_lead_time_error(mock_connect, temp_db_file):
-    # Setup mock to raise exception
+def test_calculate_lead_time_error(mock_connect, tmp_path):
+    """Test calculate_lead_time returns safe defaults on database error."""
     mock_connect.side_effect = sqlite3.Error("Test error")
 
-    report = LeadTimeReport(temp_db_file)
-    project_keys = ["TEST1", "TEST2"]
-    start_date = date(2023, 1, 1)
-    end_date = date(2023, 12, 31)
+    db_path = tmp_path / "test.db"
+    db_path.touch()
+    report = LeadTimeReport(str(db_path))
+    result = report.calculate_lead_time(
+        ["TEST1", "TEST2"], date(2023, 1, 1), date(2023, 12, 31)
+    )
 
-    # Call should handle the error gracefully
-    result = report.calculate_lead_time(project_keys, start_date, end_date)
-
-    # Should return default values
     assert result.average_lead_time == 0.0
     assert result.number_of_releases == 0
 
 
 @patch.object(LeadTimeReport, 'calculate_lead_time')
-def test_monthly_lead_time_report(mock_calculate_lead_time, temp_db_file):
-    # Setup mock return values for different months
+def test_monthly_lead_time_report(mock_calculate_lead_time, tmp_path):
+    """Test monthly_lead_time_report produces a DataFrame with correct values."""
     def mock_lead_time(project_keys, start_date, end_date):
         month = start_date.month
         return LeadTimeResult(
@@ -109,22 +89,22 @@ def test_monthly_lead_time_report(mock_calculate_lead_time, temp_db_file):
 
     mock_calculate_lead_time.side_effect = mock_lead_time
 
-    report = LeadTimeReport(temp_db_file)
-    project_keys = ["TEST1", "TEST2"]
-    start_date = date(2023, 1, 1)
-    end_date = date(2023, 3, 31)
-    result_df = report.monthly_lead_time_report(project_keys, start_date, end_date)
+    db_path = tmp_path / "test.db"
+    db_path.touch()
+    report = LeadTimeReport(str(db_path))
+    result_df = report.monthly_lead_time_report(
+        ["TEST1", "TEST2"], date(2023, 1, 1), date(2023, 3, 31)
+    )
 
-    # Verify the DataFrame structure and contents
     assert isinstance(result_df, pd.DataFrame)
-    assert len(result_df) == 3  # 3 months
+    assert len(result_df) == 3
     assert list(result_df.columns) == ["Month", "Lead Time", "Releases"]
     assert list(result_df["Lead Time"]) == [10, 20, 30]
     assert list(result_df["Releases"]) == [1, 2, 3]
 
 
-def test_show_plot(temp_db_file):
-    # Create a sample DataFrame
+def test_show_plot(tmp_path):
+    """Test _create_plot returns a non-None plot object."""
     data = {
         "Month": ["Jan", "Feb", "Mar", "Apr"],
         "Lead Time": [10, 15, 12, 8],
@@ -132,16 +112,17 @@ def test_show_plot(temp_db_file):
     }
     df = pd.DataFrame(data)
 
-    plt.close('all')  # Close any existing plots
-    report = LeadTimeReport(temp_db_file)
-
+    plt.close('all')
+    db_path = tmp_path / "test.db"
+    db_path.touch()
+    report = LeadTimeReport(str(db_path))
     plot = report._create_plot(df, title="Test Plot")
     assert plot is not None
     plt.close('all')
 
 
 def test_lead_time_result():
-    # Test creating a LeadTimeResult instance
+    """Test LeadTimeResult stores all fields correctly."""
     project_keys = ["TEST1", "TEST2"]
     start_date = date(2023, 1, 1)
     end_date = date(2023, 12, 31)
@@ -156,7 +137,6 @@ def test_lead_time_result():
         number_of_releases=number_of_releases
     )
 
-    # Verify the attributes
     assert result.project_keys == project_keys
     assert result.start_date == start_date
     assert result.end_date == end_date

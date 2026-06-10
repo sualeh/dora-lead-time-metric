@@ -3,6 +3,7 @@
 import pytest
 import os
 
+
 @pytest.fixture(autouse=True)
 def mock_env_vars(monkeypatch):
     """Mock required environment variables for tests."""
