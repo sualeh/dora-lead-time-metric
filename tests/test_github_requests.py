@@ -131,11 +131,14 @@ def test_get_pull_request_details(mock_get, github_client):
     ]
 
     # Call the method
-    result = github_client.get_pull_request_details(pull_requests)
+    pr_details, pr_failures = github_client.get_pull_request_details(
+        pull_requests
+    )
 
     # Assertions
-    assert len(result) == 1
-    pr = result[0]
+    assert len(pr_details) == 1
+    assert len(pr_failures) == 0
+    pr = pr_details[0]
     assert pr.id == 1
     assert pr.pr_title == "Test PR"
     assert pr.open_date == date(2023, 1, 1)
@@ -147,7 +150,7 @@ def test_get_pull_request_details(mock_get, github_client):
 
 @patch("requests.get")
 def test_get_pull_request_details_api_error(mock_get, github_client):
-    """Test that non-auth HTTP errors on PR details skip the PR gracefully."""
+    """Test that 404 HTTP errors on PR details are tracked as failures."""
     mock_get.return_value = MockResponse({}, 404)
 
     pull_requests = [
@@ -159,10 +162,14 @@ def test_get_pull_request_details_api_error(mock_get, github_client):
         )
     ]
 
-    result = github_client.get_pull_request_details(pull_requests)
+    pr_details, pr_failures = github_client.get_pull_request_details(
+        pull_requests
+    )
 
-    # Single-item failure is skipped; result is empty
-    assert len(result) == 0
+    # 404 failure is tracked; no successful PRs
+    assert len(pr_details) == 0
+    assert len(pr_failures) == 1
+    assert pr_failures[0] == 1
 
 
 @patch("requests.get")
@@ -194,8 +201,10 @@ def test_get_pull_request_details_commits_error(mock_get, github_client):
     result = github_client.get_pull_request_details(pull_requests)
 
     # PR is still recorded, but with empty commit data
-    assert len(result) == 1
-    pr = result[0]
+    pr_details, pr_failures = result
+    assert len(pr_details) == 1
+    assert len(pr_failures) == 0
+    pr = pr_details[0]
     assert pr.commit_count == 0
     assert pr.earliest_commit_date is None
     assert pr.latest_commit_date is None
@@ -221,8 +230,9 @@ def test_get_pull_request_details_no_token():
 
 def test_get_pull_request_details_empty_list(github_client):
     """Test with empty pull requests list."""
-    result = github_client.get_pull_request_details([])
-    assert result == []
+    pr_details, pr_failures = github_client.get_pull_request_details([])
+    assert pr_details == []
+    assert pr_failures == []
 
 
 @patch("requests.get")
@@ -239,10 +249,13 @@ def test_get_pull_request_details_missing_token_for_org(mock_get, github_client)
     ]
 
     # Call the method
-    result = github_client.get_pull_request_details(pull_requests)
+    pr_details, pr_failures = github_client.get_pull_request_details(
+        pull_requests
+    )
 
     # Should return empty list since org has no token
-    assert len(result) == 0
+    assert len(pr_details) == 0
+    assert len(pr_failures) == 0
     assert mock_get.call_count == 0  # No API calls made
 
 

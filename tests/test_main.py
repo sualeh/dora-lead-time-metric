@@ -140,7 +140,7 @@ def test_create_releases_database_saves_stories_per_release(monkeypatch):
 
         def get_pull_request_details(self, pull_requests):
             del pull_requests
-            return []
+            return [], []
 
     class FakeDatabaseProcessor:
         """Test double for DatabaseProcessor."""

@@ -867,8 +867,12 @@ class DatabaseProcessor:
                     pull_requests.pr_number
                 FROM
                     pull_requests
+                LEFT JOIN
+                    pull_requests_fetch_failures
+                    ON pull_requests.id = pull_requests_fetch_failures.pr_id
                 WHERE
                     pull_requests.pr_title IS NULL
+                    AND pull_requests_fetch_failures.pr_id IS NULL
                 LIMIT {limit}
                 """
 
@@ -907,17 +911,22 @@ class DatabaseProcessor:
         return pull_requests
 
     def save_pull_request_details(
-        self, pull_request_details
+        self, pull_request_details, pull_request_fetch_failures_404=None
     ) -> None:
         """Saves detailed information about each GitHub pull request to the
             database.
 
         Args:
             pull_request_details: List of PullRequest objects with details
+            pull_request_fetch_failures_404: List of PR IDs that failed to
+                fetch with 404 errors (optional)
 
         Raises:
             Exception: If there's an error saving data to the database
         """
+        if pull_request_fetch_failures_404 is None:
+            pull_request_fetch_failures_404 = []
+
         conn = None
         try:
             logger.info(
@@ -953,6 +962,21 @@ class DatabaseProcessor:
                 ) for pr in pull_request_details]
             )
             logger.info("Updated %d pull requests", cursor.rowcount)
+
+            # Insert PR fetch failures (404s)
+            if pull_request_fetch_failures_404:
+                cursor.executemany(
+                    """
+                    INSERT OR IGNORE INTO pull_requests_fetch_failures
+                    (pr_id)
+                    VALUES (?)
+                    """,
+                    [(pr_id,) for pr_id in pull_request_fetch_failures_404]
+                )
+                logger.info(
+                    "Recorded %d pull request fetch failures",
+                    len(pull_request_fetch_failures_404)
+                )
 
             conn.commit()
         except (
