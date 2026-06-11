@@ -3,7 +3,7 @@
 import os
 import pytest
 import sqlite3
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from dora_lead_time.database_processor import (
     DatabaseOperationError,
     DatabaseProcessor,
@@ -53,6 +53,7 @@ def test_create_schema(db_processor):
     assert "pull_requests" in tables
     assert "stories_pull_requests" in tables
     assert "stories_without_pull_requests" in tables
+    assert "releases_without_stories" in tables
 
     # Check if view exists
     cursor.execute("SELECT name FROM sqlite_master WHERE type='view';")
@@ -81,6 +82,20 @@ def test_create_schema(db_processor):
     assert marker_columns["story_id"] == "INTEGER"
     assert marker_columns["processed_at"] == "DATETIME"
     assert marker_pk_columns == {"story_id"}
+
+    cursor.execute(
+        "PRAGMA table_info(releases_without_stories);"
+    )
+    release_marker_rows = cursor.fetchall()
+    release_marker_columns = {
+        row[1]: row[2].upper() for row in release_marker_rows
+    }
+    release_marker_pk_columns = {
+        row[1] for row in release_marker_rows if row[5] == 1
+    }
+    assert release_marker_columns["release_id"] == "INTEGER"
+    assert release_marker_columns["processed_at"] == "DATETIME"
+    assert release_marker_pk_columns == {"release_id"}
 
     cursor.execute("PRAGMA table_info(pull_requests);")
     pr_columns = {row[1]: row[2].upper() for row in cursor.fetchall()}
@@ -622,6 +637,185 @@ def test_save_stories_links_by_story_internal_id(db_processor):
 
     assert story_count == 1
     assert link_count == 2
+
+
+def test_retrieve_releases_without_stories_filters_past_releases(
+    db_processor,
+):
+    """Only releases with a past release date should be returned."""
+    db_processor.create_schema()
+
+    today = date.today()
+    yesterday = (today - timedelta(days=1)).isoformat()
+    tomorrow = (today + timedelta(days=1)).isoformat()
+
+    conn = sqlite3.connect(db_processor.sqlite_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO projects (
+            project_internal_id,
+            project_key,
+            project_title,
+            project_type
+        )
+        VALUES (?, ?, ?, ?)
+        """,
+        ("P1", "PROJ", "Project", "software"),
+    )
+    cursor.execute(
+        """
+        INSERT INTO releases (
+            release_internal_id,
+            release_title,
+            release_description,
+            release_date,
+            project_id
+        )
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        ("REL-PAST", "Past", "", yesterday, 1),
+    )
+    cursor.execute(
+        """
+        INSERT INTO releases (
+            release_internal_id,
+            release_title,
+            release_description,
+            release_date,
+            project_id
+        )
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        ("REL-TODAY", "Today", "", today.isoformat(), 1),
+    )
+    cursor.execute(
+        """
+        INSERT INTO releases (
+            release_internal_id,
+            release_title,
+            release_description,
+            release_date,
+            project_id
+        )
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        ("REL-FUTURE", "Future", "", tomorrow, 1),
+    )
+    conn.commit()
+    conn.close()
+
+    release_ids = db_processor.retrieve_releases_without_stories()
+
+    assert release_ids == ["REL-PAST"]
+
+
+def test_retrieve_releases_without_stories_ignores_processed_releases(
+    db_processor,
+):
+    """Processed no-story releases should be excluded from retrieval."""
+    db_processor.create_schema()
+
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+
+    conn = sqlite3.connect(db_processor.sqlite_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO projects (
+            project_internal_id,
+            project_key,
+            project_title,
+            project_type
+        )
+        VALUES (?, ?, ?, ?)
+        """,
+        ("P1", "PROJ", "Project", "software"),
+    )
+    cursor.execute(
+        """
+        INSERT INTO releases (
+            release_internal_id,
+            release_title,
+            release_description,
+            release_date,
+            project_id
+        )
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        ("REL-A", "A", "", yesterday, 1),
+    )
+    cursor.execute(
+        """
+        INSERT INTO releases (
+            release_internal_id,
+            release_title,
+            release_description,
+            release_date,
+            project_id
+        )
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        ("REL-B", "B", "", yesterday, 1),
+    )
+    conn.commit()
+    conn.close()
+
+    db_processor.save_releases_without_stories(["REL-B"])
+    release_ids = db_processor.retrieve_releases_without_stories()
+
+    assert release_ids == ["REL-A"]
+
+
+def test_save_releases_without_stories_saves_markers(db_processor):
+    """Saving no-story releases should create marker rows."""
+    db_processor.create_schema()
+
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+
+    conn = sqlite3.connect(db_processor.sqlite_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO projects (
+            project_internal_id,
+            project_key,
+            project_title,
+            project_type
+        )
+        VALUES (?, ?, ?, ?)
+        """,
+        ("P1", "PROJ", "Project", "software"),
+    )
+    cursor.execute(
+        """
+        INSERT INTO releases (
+            release_internal_id,
+            release_title,
+            release_description,
+            release_date,
+            project_id
+        )
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        ("REL-MARK", "Marked", "", yesterday, 1),
+    )
+    conn.commit()
+
+    db_processor.save_releases_without_stories(["REL-MARK"])
+
+    cursor.execute(
+        """
+        SELECT releases.release_internal_id
+        FROM releases_without_stories
+        JOIN releases
+            ON releases_without_stories.release_id = releases.id
+        """
+    )
+    marked_releases = [row[0] for row in cursor.fetchall()]
+    conn.close()
+
+    assert marked_releases == ["REL-MARK"]
 
 
 def test_retrieve_pull_requests_without_details_honors_explicit_limit(

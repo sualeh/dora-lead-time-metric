@@ -156,6 +156,7 @@ def create_releases_database(config: LeadTimeConfiguration):
                 logger.info(
                     "-- 4. No stories found for release %s", release_id
                 )
+                db_processor.save_releases_without_stories([release_id])
                 continue
 
             db_processor.save_stories(stories)

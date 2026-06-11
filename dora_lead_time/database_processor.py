@@ -444,8 +444,12 @@ class DatabaseProcessor:
                     releases
                     LEFT JOIN releases_stories
                         ON releases.id = releases_stories.release_id
+                    LEFT JOIN releases_without_stories
+                        ON releases.id = releases_without_stories.release_id
                 WHERE
                     releases_stories.story_id IS NULL
+                    AND releases_without_stories.release_id IS NULL
+                    AND releases.release_date < date('now')
                 """
             )
 
@@ -471,6 +475,61 @@ class DatabaseProcessor:
                 conn.close()
 
         return release_ids
+
+    def save_releases_without_stories(
+        self,
+        release_internal_ids: list[str],
+    ) -> None:
+        """Mark releases as processed when no stories are found.
+
+        Args:
+            release_internal_ids: Release internal IDs confirmed to have
+                no stories at fetch time.
+
+        Raises:
+            DatabaseOperationError: If there's an error saving markers.
+        """
+        if not release_internal_ids:
+            return
+
+        conn = None
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            cursor.executemany(
+                """
+                INSERT OR IGNORE INTO releases_without_stories (
+                    release_id
+                )
+                SELECT releases.id
+                FROM releases
+                WHERE releases.release_internal_id = ?
+                """,
+                [(release_id,) for release_id in release_internal_ids],
+            )
+            logger.info(
+                "Inserted %d releases without stories markers",
+                cursor.rowcount,
+            )
+
+            conn.commit()
+        except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+            logger.error(
+                """
+                %s
+                Could not save releases without stories markers
+                """,
+                e,
+            )
+            if conn:
+                conn.rollback()
+            raise DatabaseOperationError(
+                "Could not save releases without stories markers"
+            ) from e
+        finally:
+            if conn:
+                conn.close()
 
     def save_stories(self, stories: list[StoryInRelease]) -> None:
         """Saves stories to the database.

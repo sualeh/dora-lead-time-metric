@@ -102,6 +102,7 @@ def test_save_outlier_reports_uses_requested_order(tmp_path, monkeypatch):
 def test_create_releases_database_saves_stories_per_release(monkeypatch):
     """Stories should be persisted immediately after each release fetch."""
     save_stories_batch_sizes = []
+    saved_no_story_releases = []
 
     class FakeAtlassianRequests:
         """Test double for AtlassianRequests with batched stories."""
@@ -126,6 +127,8 @@ def test_create_releases_database_saves_stories_per_release(monkeypatch):
             assert len(releases) == 1
             if releases[0] == "R1":
                 return [("story", "rel")] * 100
+            if releases[0] == "R2":
+                return []
             return [("story", "rel")] * 10
 
         def get_story_pull_requests(self, story_records):
@@ -166,6 +169,9 @@ def test_create_releases_database_saves_stories_per_release(monkeypatch):
         def save_stories(self, stories):
             save_stories_batch_sizes.append(len(stories))
 
+        def save_releases_without_stories(self, release_ids):
+            saved_no_story_releases.extend(release_ids)
+
         def retrieve_stories_without_pull_requests(self, limit):
             del limit
             return []
@@ -194,4 +200,5 @@ def test_create_releases_database_saves_stories_per_release(monkeypatch):
 
     main.create_releases_database(config)
 
-    assert save_stories_batch_sizes == [100, 10]
+    assert save_stories_batch_sizes == [100]
+    assert saved_no_story_releases == ["R2"]
