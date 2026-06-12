@@ -76,7 +76,7 @@ class GitHubRequests:
 
     def get_pull_request_details(
         self, pull_requests: list[PullRequestIdentifier]
-    ) -> list[PullRequest]:
+    ) -> tuple[list[PullRequest], list[int]]:
         """
         Retrieves detailed information about each GitHub pull request.
 
@@ -85,18 +85,21 @@ class GitHubRequests:
                 PullRequestIdentifier
 
         Returns:
-            list[PullRequest]: A list of PullRequest
+            tuple[list[PullRequest], list[int]]: A tuple containing:
+                - A list of successfully fetched PullRequest objects
+                - A list of PR IDs that failed with 404 errors
 
         Raises:
             ValueError: If GitHub token is not provided
             requests.RequestException: If there's an error connecting to GitHub
         """
         if not pull_requests:
-            return []
+            return [], []
         if not self.github_token_map:
             raise ValueError("No GitHub tokens available in token map")
 
         pr_details = []
+        pr_fetch_failures_404 = []
 
         total_prs = len(pull_requests)
         prs_attempted = 0
@@ -139,6 +142,8 @@ class GitHubRequests:
                 timeout=self.request_timeout, raise_on_error=False,
             )
             if response.status_code != 200:
+                if response.status_code == 404:
+                    pr_fetch_failures_404.append(pr.id)
                 logger.warning(
                     "Could not fetch PR details for %s/%s/%s "
                     "(HTTP %s); skipping",
@@ -240,7 +245,7 @@ class GitHubRequests:
             pr_failed,
         )
 
-        return pr_details
+        return pr_details, pr_fetch_failures_404
 
 
 def main():

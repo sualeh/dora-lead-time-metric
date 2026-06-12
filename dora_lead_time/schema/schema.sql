@@ -80,6 +80,18 @@ CREATE TABLE IF NOT EXISTS stories_without_pull_requests (
 	FOREIGN KEY (story_id) REFERENCES stories (id)
 );
 
+CREATE TABLE IF NOT EXISTS releases_without_stories (
+	release_id INTEGER PRIMARY KEY,
+	processed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (release_id) REFERENCES releases (id)
+);
+
+CREATE TABLE IF NOT EXISTS pull_requests_fetch_failures (
+	pr_id INTEGER PRIMARY KEY,
+	processed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (pr_id) REFERENCES pull_requests (id)
+);
+
 DROP VIEW IF EXISTS lead_times;
 
 CREATE VIEW lead_times AS

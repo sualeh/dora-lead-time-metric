@@ -156,6 +156,7 @@ def create_releases_database(config: LeadTimeConfiguration):
                 logger.info(
                     "-- 4. No stories found for release %s", release_id
                 )
+                db_processor.save_releases_without_stories([release_id])
                 continue
 
             db_processor.save_stories(stories)
@@ -216,8 +217,12 @@ def create_releases_database(config: LeadTimeConfiguration):
                 pr_details_iteration,
                 len(pull_requests)
             )
-            pr_details = github_client.get_pull_request_details(pull_requests)
-            db_processor.save_pull_request_details(pr_details)
+            pr_details, pr_fetch_failures_404 = (
+                github_client.get_pull_request_details(pull_requests)
+            )
+            db_processor.save_pull_request_details(
+                pr_details, pr_fetch_failures_404
+            )
 
             if pr_details_iteration % PROGRESS_CHECKPOINT_INTERVAL == 0:
                 logger.info(

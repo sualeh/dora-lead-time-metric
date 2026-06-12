@@ -444,8 +444,12 @@ class DatabaseProcessor:
                     releases
                     LEFT JOIN releases_stories
                         ON releases.id = releases_stories.release_id
+                    LEFT JOIN releases_without_stories
+                        ON releases.id = releases_without_stories.release_id
                 WHERE
                     releases_stories.story_id IS NULL
+                    AND releases_without_stories.release_id IS NULL
+                    AND releases.release_date < date('now')
                 """
             )
 
@@ -471,6 +475,61 @@ class DatabaseProcessor:
                 conn.close()
 
         return release_ids
+
+    def save_releases_without_stories(
+        self,
+        release_internal_ids: list[str],
+    ) -> None:
+        """Mark releases as processed when no stories are found.
+
+        Args:
+            release_internal_ids: Release internal IDs confirmed to have
+                no stories at fetch time.
+
+        Raises:
+            DatabaseOperationError: If there's an error saving markers.
+        """
+        if not release_internal_ids:
+            return
+
+        conn = None
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            cursor.executemany(
+                """
+                INSERT OR IGNORE INTO releases_without_stories (
+                    release_id
+                )
+                SELECT releases.id
+                FROM releases
+                WHERE releases.release_internal_id = ?
+                """,
+                [(release_id,) for release_id in release_internal_ids],
+            )
+            logger.info(
+                "Inserted %d releases without stories markers",
+                cursor.rowcount,
+            )
+
+            conn.commit()
+        except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+            logger.error(
+                """
+                %s
+                Could not save releases without stories markers
+                """,
+                e,
+            )
+            if conn:
+                conn.rollback()
+            raise DatabaseOperationError(
+                "Could not save releases without stories markers"
+            ) from e
+        finally:
+            if conn:
+                conn.close()
 
     def save_stories(self, stories: list[StoryInRelease]) -> None:
         """Saves stories to the database.
@@ -867,8 +926,12 @@ class DatabaseProcessor:
                     pull_requests.pr_number
                 FROM
                     pull_requests
+                LEFT JOIN
+                    pull_requests_fetch_failures
+                    ON pull_requests.id = pull_requests_fetch_failures.pr_id
                 WHERE
                     pull_requests.pr_title IS NULL
+                    AND pull_requests_fetch_failures.pr_id IS NULL
                 LIMIT {limit}
                 """
 
@@ -907,17 +970,22 @@ class DatabaseProcessor:
         return pull_requests
 
     def save_pull_request_details(
-        self, pull_request_details
+        self, pull_request_details, pull_request_fetch_failures_404=None
     ) -> None:
         """Saves detailed information about each GitHub pull request to the
             database.
 
         Args:
             pull_request_details: List of PullRequest objects with details
+            pull_request_fetch_failures_404: List of PR IDs that failed to
+                fetch with 404 errors (optional)
 
         Raises:
             Exception: If there's an error saving data to the database
         """
+        if pull_request_fetch_failures_404 is None:
+            pull_request_fetch_failures_404 = []
+
         conn = None
         try:
             logger.info(
@@ -953,6 +1021,21 @@ class DatabaseProcessor:
                 ) for pr in pull_request_details]
             )
             logger.info("Updated %d pull requests", cursor.rowcount)
+
+            # Insert PR fetch failures (404s)
+            if pull_request_fetch_failures_404:
+                cursor.executemany(
+                    """
+                    INSERT OR IGNORE INTO pull_requests_fetch_failures
+                    (pr_id)
+                    VALUES (?)
+                    """,
+                    [(pr_id,) for pr_id in pull_request_fetch_failures_404]
+                )
+                logger.info(
+                    "Recorded %d pull request fetch failures",
+                    len(pull_request_fetch_failures_404)
+                )
 
             conn.commit()
         except (
