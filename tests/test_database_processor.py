@@ -60,6 +60,29 @@ def test_create_schema(db_processor):
     views = [row[0] for row in cursor.fetchall()]
 
     assert "lead_times" in views
+    assert "summary" in views
+    assert "progress" in views
+
+    cursor.execute(
+        """
+        SELECT
+            id,
+            type,
+            count
+        FROM
+            progress
+        ORDER BY
+            id
+        """
+    )
+    progress_rows = cursor.fetchall()
+    assert len(progress_rows) == 3
+    assert progress_rows[0][1] == "stories remaining"
+    assert progress_rows[1][1] == "PRs waiting"
+    assert progress_rows[2][1] == "partial PRs"
+    assert progress_rows[0][2] == 0
+    assert progress_rows[1][2] == 0
+    assert progress_rows[2][2] == 0
 
     # New database files should use typed date declarations.
     cursor.execute("PRAGMA table_info(releases);")

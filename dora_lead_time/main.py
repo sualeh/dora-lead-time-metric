@@ -114,20 +114,22 @@ def create_releases_database(config: LeadTimeConfiguration):
     # Initialize database processor
     db_processor = DatabaseProcessor(config.sqlite_path)
 
+    # Beginning-of-run summary
+    db_processor.print_summary()
+
     if not config.build_database:
-        db_processor.print_summary()
         return
 
     # Step 1: Create schema
     logger.info("-- 1. Creating releases database schema")
     db_processor.create_schema()
-    db_processor.print_summary()
+    db_processor.print_progress()
 
     # Step 2: Get and save projects
     logger.info("-- 2. Getting projects from Atlassian Jira")
     projects = atlassian_client.get_projects()
     db_processor.save_projects(projects)
-    db_processor.print_summary()
+    db_processor.print_progress()
 
     # Step 3: Get and save releases
     logger.info(
@@ -141,7 +143,7 @@ def create_releases_database(config: LeadTimeConfiguration):
         projects=projects,
     )
     db_processor.save_releases(releases)
-    db_processor.print_summary()
+    db_processor.print_progress()
 
     # Step 4: Find releases without stories, get stories and save them
     logger.info("-- 4. Getting stories for releases from Atlassian Jira")
@@ -167,7 +169,7 @@ def create_releases_database(config: LeadTimeConfiguration):
                 release_id,
                 stories_saved,
             )
-    db_processor.print_summary()
+    db_processor.print_progress()
 
     # Step 5: Find stories without pull requests, get PRs and save them
     logger.info("-- 5. Getting pull requests for stories from Atlassian Jira")
@@ -193,13 +195,13 @@ def create_releases_database(config: LeadTimeConfiguration):
             if pr_lookup_iteration % PROGRESS_CHECKPOINT_INTERVAL == 0:
                 logger.info(
                     "-- 5. Pull requests checkpoint at iteration %d: "
-                    "printing database summary",
+                    "printing database progress",
                     pr_lookup_iteration,
                 )
-                db_processor.print_summary()
+                db_processor.print_progress()
         else:
             break
-    db_processor.print_summary()
+    db_processor.print_progress()
 
     # Step 6: Find pull requests without details, get details and save them
     logger.info("-- 6. Getting details for pull requests from GitHub")
@@ -227,15 +229,17 @@ def create_releases_database(config: LeadTimeConfiguration):
             if pr_details_iteration % PROGRESS_CHECKPOINT_INTERVAL == 0:
                 logger.info(
                     "-- 6. Pull requests details checkpoint at iteration %d: "
-                    "printing database summary",
+                    "printing database progress",
                     pr_details_iteration,
                 )
-                db_processor.print_summary()
+                db_processor.print_progress()
         else:
             break
-    db_processor.print_summary()
+    db_processor.print_progress()
 
     logger.info("-- 7. Release database creation completed successfully")
+
+    # End-of-run summary
     db_processor.print_summary()
 
 

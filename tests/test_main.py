@@ -103,6 +103,7 @@ def test_create_releases_database_saves_stories_per_release(monkeypatch):
     """Stories should be persisted immediately after each release fetch."""
     save_stories_batch_sizes = []
     saved_no_story_releases = []
+    print_calls = []
 
     class FakeAtlassianRequests:
         """Test double for AtlassianRequests with batched stories."""
@@ -155,6 +156,11 @@ def test_create_releases_database_saves_stories_per_release(monkeypatch):
             return None
 
         def print_summary(self):
+            print_calls.append("summary")
+            return None
+
+        def print_progress(self):
+            print_calls.append("progress")
             return None
 
         def save_projects(self, projects):
@@ -202,3 +208,6 @@ def test_create_releases_database_saves_stories_per_release(monkeypatch):
 
     assert save_stories_batch_sizes == [100]
     assert saved_no_story_releases == ["R2"]
+    assert print_calls[0] == "summary"
+    assert print_calls[-1] == "summary"
+    assert all(call == "progress" for call in print_calls[1:-1])

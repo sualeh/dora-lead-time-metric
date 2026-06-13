@@ -149,10 +149,51 @@ FROM
 UNION
 SELECT
   3 as id,
-  'partial PRs' AS type,
+  'pull requests' AS type,
   COUNT(*) AS count,
   MIN(pr_open) AS earliest_date,
   MAX(pr_close) AS latest_date
+FROM
+  pull_requests
+;
+
+DROP VIEW IF EXISTS progress;
+
+CREATE VIEW progress AS
+SELECT
+	1 as id,
+	'stories remaining' AS type,
+	COUNT(*) AS count
+FROM
+	releases
+	LEFT OUTER JOIN releases_stories
+		ON releases.id = releases_stories.release_id
+	LEFT OUTER JOIN releases_without_stories
+		ON releases.id = releases_without_stories.release_id
+WHERE
+	releases_stories.release_id IS NULL
+	AND
+	releases_without_stories.release_id IS NULL
+UNION
+SELECT
+	2 as id,
+	'PRs waiting' AS type,
+	COUNT(*) AS count
+FROM
+	stories
+	LEFT OUTER JOIN stories_pull_requests
+		ON stories.id = stories_pull_requests.story_id
+	LEFT OUTER JOIN stories_without_pull_requests
+		ON stories.id = stories_without_pull_requests.story_id
+WHERE
+	stories_pull_requests.story_id IS NULL
+	AND
+	stories_without_pull_requests.story_id IS NULL
+UNION
+SELECT
+	3 as id,
+	'partial PRs' AS type,
+  COUNT(*) AS count
 FROM
   pull_requests
   LEFT OUTER JOIN pull_requests_fetch_failures
@@ -161,13 +202,4 @@ WHERE
   pull_requests_fetch_failures.pr_id IS NULL
   AND
   pull_requests.pr_title IS NULL
-UNION
-SELECT
-  4 as id,
-  'pull requests' AS type,
-  COUNT(*) AS count,
-  MIN(pr_open) AS earliest_date,
-  MAX(pr_close) AS latest_date
-FROM
-  pull_requests
 ;
