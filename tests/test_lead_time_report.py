@@ -35,14 +35,12 @@ def test_get_connection(mock_connect, tmp_path):
     assert conn == mock_conn
 
 
-@patch('sqlite3.connect')
-def test_calculate_lead_time(mock_connect, tmp_path):
+@patch.object(LeadTimeReport, '_load_lead_times_dataframe')
+def test_calculate_lead_time(mock_load_lead_times, tmp_path):
     """Test calculate_lead_time returns a populated LeadTimeResult."""
-    mock_cursor = MagicMock()
-    mock_conn = MagicMock()
-    mock_conn.cursor.return_value = mock_cursor
-    mock_connect.return_value = mock_conn
-    mock_cursor.fetchall.return_value = [(10.5, 5)]
+    mock_load_lead_times.return_value = pd.DataFrame(
+        {"release_date": ["2023-01-01", "2023-01-02"], "lead_time": [10, 11]}
+    )
 
     db_path = tmp_path / "test.db"
     db_path.touch()
@@ -53,17 +51,18 @@ def test_calculate_lead_time(mock_connect, tmp_path):
     result = report.calculate_lead_time(project_keys, start_date, end_date)
 
     assert isinstance(result, LeadTimeResult)
-    assert result.average_lead_time == 10.5
-    assert result.number_of_releases == 5
+    assert result.mean_lead_time == 10.5
+    assert result.median_lead_time == 10.5
+    assert result.pull_request_count == 2
     assert result.project_keys == project_keys
     assert result.start_date == start_date
     assert result.end_date == end_date
 
 
-@patch('sqlite3.connect')
-def test_calculate_lead_time_error(mock_connect, tmp_path):
+@patch.object(LeadTimeReport, '_load_lead_times_dataframe')
+def test_calculate_lead_time_error(mock_load_lead_times, tmp_path):
     """Test calculate_lead_time returns safe defaults on database error."""
-    mock_connect.side_effect = sqlite3.Error("Test error")
+    mock_load_lead_times.side_effect = sqlite3.Error("Test error")
 
     db_path = tmp_path / "test.db"
     db_path.touch()
@@ -72,8 +71,9 @@ def test_calculate_lead_time_error(mock_connect, tmp_path):
         ["TEST1", "TEST2"], date(2023, 1, 1), date(2023, 12, 31)
     )
 
-    assert result.average_lead_time == 0.0
-    assert result.number_of_releases == 0
+    assert result.mean_lead_time == 0.0
+    assert result.median_lead_time == 0.0
+    assert result.pull_request_count == 0
 
 
 def test_calculate_lead_time_deduplicates_same_pr_linked_to_two_stories(
@@ -161,25 +161,25 @@ def test_calculate_lead_time_deduplicates_same_pr_linked_to_two_stories(
     )
 
     # PR 1 lead time = 5 days, PR 2 lead time = 9 days.
-    # Expected deduped average is (5 + 9) / 2 = 7.
-    assert result.average_lead_time == pytest.approx(7.0)
-    assert result.number_of_releases == 2
+    assert result.mean_lead_time == pytest.approx(7.0)
+    assert result.median_lead_time == pytest.approx(7.0)
+    assert result.pull_request_count == 2
 
 
-@patch.object(LeadTimeReport, 'calculate_lead_time')
-def test_monthly_lead_time_report(mock_calculate_lead_time, tmp_path):
-    """Test monthly_lead_time_report produces a DataFrame with correct values."""
-    def mock_lead_time(project_keys, start_date, end_date):
-        month = start_date.month
-        return LeadTimeResult(
-            project_keys=project_keys,
-            start_date=start_date,
-            end_date=end_date,
-            average_lead_time=10.0 * month,
-            number_of_releases=month
-        )
-
-    mock_calculate_lead_time.side_effect = mock_lead_time
+@patch.object(LeadTimeReport, '_load_lead_times_dataframe')
+def test_monthly_lead_time_report(mock_load_lead_times, tmp_path):
+    """Test monthly_lead_time_report includes mean and median metrics."""
+    mock_load_lead_times.return_value = pd.DataFrame(
+        {
+            "release_date": [
+                "2023-01-05",
+                "2023-01-20",
+                "2023-02-03",
+                "2023-02-10",
+            ],
+            "lead_time": [10, 20, 5, 9],
+        }
+    )
 
     db_path = tmp_path / "test.db"
     db_path.touch()
@@ -190,17 +190,19 @@ def test_monthly_lead_time_report(mock_calculate_lead_time, tmp_path):
 
     assert isinstance(result_df, pd.DataFrame)
     assert len(result_df) == 3
-    assert list(result_df.columns) == ["Month", "Lead Time", "Releases"]
-    assert list(result_df["Lead Time"]) == [10, 20, 30]
-    assert list(result_df["Releases"]) == [1, 2, 3]
+    assert list(result_df.columns) == [
+        "Month", "Mean Lead Time", "Median Lead Time"
+    ]
+    assert list(result_df["Mean Lead Time"]) == [15, 7, 0]
+    assert list(result_df["Median Lead Time"]) == [15, 7, 0]
 
 
 def test_show_plot(tmp_path):
     """Test _create_plot returns a matplotlib Figure and no extra figure."""
     data = {
         "Month": ["Jan", "Feb", "Mar", "Apr"],
-        "Lead Time": [10, 15, 12, 8],
-        "Releases": [5, 8, 6, 10]
+        "Mean Lead Time": [10, 15, 12, 8],
+        "Median Lead Time": [9, 11, 10, 7]
     }
     df = pd.DataFrame(data)
 
@@ -219,19 +221,22 @@ def test_lead_time_result():
     project_keys = ["TEST1", "TEST2"]
     start_date = date(2023, 1, 1)
     end_date = date(2023, 12, 31)
-    average_lead_time = 10.5
-    number_of_releases = 5
+    mean_lead_time = 10.5
+    median_lead_time = 9.0
+    pull_request_count = 5
 
     result = LeadTimeResult(
         project_keys=project_keys,
         start_date=start_date,
         end_date=end_date,
-        average_lead_time=average_lead_time,
-        number_of_releases=number_of_releases
+        mean_lead_time=mean_lead_time,
+        median_lead_time=median_lead_time,
+        pull_request_count=pull_request_count
     )
 
     assert result.project_keys == project_keys
     assert result.start_date == start_date
     assert result.end_date == end_date
-    assert result.average_lead_time == average_lead_time
-    assert result.number_of_releases == number_of_releases
+    assert result.mean_lead_time == mean_lead_time
+    assert result.median_lead_time == median_lead_time
+    assert result.pull_request_count == pull_request_count

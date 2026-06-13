@@ -33,18 +33,18 @@ class LeadTimeResult(NamedTuple):
             was calculated.
         end_date: The end date of the period for which lead time
             was calculated.
-        average_lead_time: The average lead time (in days) for the
-            specified period.
-        number_of_releases: The total number of releases during the
-            specified period.
+        mean_lead_time: The mean lead time (in days) for the specified period.
+        median_lead_time: The median lead time (in days) for the period.
+        pull_request_count: Number of pull requests included in the metric.
     """
 
     project_keys: list[str]
     start_date: date
     end_date: date
     # Results
-    average_lead_time: float
-    number_of_releases: int
+    mean_lead_time: float
+    median_lead_time: float
+    pull_request_count: int
 
 
 class LeadTimeReport:
@@ -93,13 +93,8 @@ class LeadTimeReport:
     ) -> LeadTimeResult:
         """Calculate lead time for project releases between two dates.
 
-        Calculates the average lead time and number of releases for the
+        Calculates mean and median lead times plus pull-request count for the
         specified projects within the given date range.
-
-        The average is computed over individual PR lead times, not per
-        release. A release with many PRs contributes proportionally more
-        to the average than a release with few PRs. PRs with a lead time
-        of zero or less (same-day or post-release commits) are excluded.
 
         Args:
             project_keys: List of project keys to include (e.g., ['PR', 'TS']).
@@ -107,47 +102,35 @@ class LeadTimeReport:
             end_date: End date for the time period (inclusive).
 
         Returns:
-            A LeadTimeResult named tuple containing the average lead time,
-            number of releases, and input parameters.
+            A LeadTimeResult named tuple containing mean lead time, median
+            lead time, pull-request count, and input parameters.
 
         Raises:
             sqlite3.Error: If there's an error querying the database.
         """
-        conn = None
         try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
+            lead_times_df = self._load_lead_times_dataframe(
+                project_keys,
+                start_date,
+                end_date
+            )
+            if lead_times_df.empty:
+                return LeadTimeResult(
+                    project_keys=project_keys,
+                    start_date=start_date,
+                    end_date=end_date,
+                    mean_lead_time=0.0,
+                    median_lead_time=0.0,
+                    pull_request_count=0,
+                )
 
-            # Prepare the SQL query with placeholders for the IN clause
-            # and date range
-            project_keys_placeholders = ", ".join(["?"] * len(project_keys))
-            query = f"""
-            SELECT
-                CASE WHEN COUNT(lead_times.lead_time) = 0
-                    THEN 0
-                    ELSE AVG(lead_times.lead_time)
-                END
-                AS average_lead_time,
-                COUNT(lead_times.lead_time) AS number_of_releases
-            FROM
-                lead_times
-            WHERE
-                lead_times.project_key
-                    IN ({project_keys_placeholders})
-                AND lead_times.lead_time > 0
-                AND lead_times.release_date
-                    BETWEEN ? AND ?
-            """
-
-            cursor.execute(query, project_keys + [start_date, end_date])
-
-            avg_lead_time, num_releases = cursor.fetchall()[0]
             return LeadTimeResult(
                 project_keys=project_keys,
                 start_date=start_date,
                 end_date=end_date,
-                average_lead_time=avg_lead_time,
-                number_of_releases=num_releases,
+                mean_lead_time=float(lead_times_df["lead_time"].mean()),
+                median_lead_time=float(lead_times_df["lead_time"].median()),
+                pull_request_count=int(lead_times_df["lead_time"].count()),
             )
         except sqlite3.Error as e:
             logger.error(
@@ -160,15 +143,13 @@ class LeadTimeReport:
                 project_keys,
             )
             return LeadTimeResult(
-                average_lead_time=0.0,
-                number_of_releases=0,
                 project_keys=project_keys,
                 start_date=start_date,
                 end_date=end_date,
+                mean_lead_time=0.0,
+                median_lead_time=0.0,
+                pull_request_count=0,
             )
-        finally:
-            if conn:
-                conn.close()
 
     def monthly_lead_time_report(
         self, project_keys: list[str], start_date: date, end_date: date
@@ -184,31 +165,88 @@ class LeadTimeReport:
             end_date: End date for the report period (inclusive).
 
         Returns:
-            A pandas DataFrame with columns for Month, Lead Time, and Releases,
-            containing the monthly metrics for the specified time period.
+            A pandas DataFrame with columns for Month, Mean Lead Time, and
+            Median Lead Time containing monthly metrics for the period.
         """
-
-        month_names = []
-        lead_times = []
-        number_of_releases = []
-
-        months = DateUtility.get_months_between(start_date, end_date)
-        for year, month in months:
-            month_details = DateUtility.get_month_start_end(year, month)
-            lead_time = self.calculate_lead_time(
-                project_keys, month_details.start_date, month_details.end_date
+        month_names = [
+            f"{year}-{month}"
+            for year, month in DateUtility.get_months_between(
+                start_date, end_date
             )
-            month_names.append(f"{year}-{month}")
-            lead_times.append(round(lead_time.average_lead_time))
-            number_of_releases.append(lead_time.number_of_releases)
+        ]
+        monthly_frame = pd.DataFrame({"Month": month_names})
 
-        lead_times_frame = {}
-        lead_times_frame["Month"] = month_names
-        lead_times_frame["Lead Time"] = lead_times
-        lead_times_frame["Releases"] = number_of_releases
+        lead_times_df = self._load_lead_times_dataframe(
+            project_keys,
+            start_date,
+            end_date
+        )
+        if lead_times_df.empty:
+            monthly_frame["Mean Lead Time"] = 0
+            monthly_frame["Median Lead Time"] = 0
+            return monthly_frame
 
-        monthly_lead_time_report_data_frame = pd.DataFrame(lead_times_frame)
-        return monthly_lead_time_report_data_frame
+        lead_times_df["release_date"] = pd.to_datetime(
+            lead_times_df["release_date"]
+        )
+        lead_times_df["Month"] = (
+            lead_times_df["release_date"].dt.year.astype(str)
+            + "-"
+            + lead_times_df["release_date"].dt.month.astype(str)
+        )
+
+        grouped_metrics = (
+            lead_times_df
+            .groupby("Month")["lead_time"]
+            .agg(["mean", "median"])
+            .reset_index()
+        )
+        monthly_frame = monthly_frame.merge(
+            grouped_metrics,
+            on="Month",
+            how="left"
+        ).fillna(0)
+        monthly_frame["Mean Lead Time"] = (
+            monthly_frame["mean"].round().astype(int)
+        )
+        monthly_frame["Median Lead Time"] = (
+            monthly_frame["median"].round().astype(int)
+        )
+
+        return monthly_frame[["Month", "Mean Lead Time", "Median Lead Time"]]
+
+    def _load_lead_times_dataframe(
+        self,
+        project_keys: list[str],
+        start_date: date,
+        end_date: date
+    ) -> DataFrame:
+        """Load lead-time rows into a pandas DataFrame for aggregation."""
+        conn = None
+        try:
+            conn = self._get_connection()
+            project_keys_placeholders = ", ".join(["?"] * len(project_keys))
+            query = f"""
+            SELECT
+                lead_times.release_date,
+                lead_times.lead_time
+            FROM
+                lead_times
+            WHERE
+                lead_times.project_key
+                    IN ({project_keys_placeholders})
+                AND lead_times.lead_time > 0
+                AND lead_times.release_date
+                    BETWEEN ? AND ?
+            """
+            return pd.read_sql_query(
+                query,
+                conn,
+                params=project_keys + [start_date, end_date]
+            )
+        finally:
+            if conn:
+                conn.close()
 
     def _create_plot(
         self,
@@ -308,15 +346,21 @@ class LeadTimeReport:
             end_date
         )
         lead_time_summary = \
-            "Lead time for changes is " \
-            f"{round(lead_time.average_lead_time)} days average " \
-            f"over {lead_time.number_of_releases} releases"
+            f"Mean lead time: {round(lead_time.mean_lead_time)} days · " \
+            f"Median lead time: {round(lead_time.median_lead_time)} days · " \
+            f"{lead_time.pull_request_count} pull requests"
 
         # Generate monthly lead time report
         df = self.monthly_lead_time_report(
             project_keys, start_date, end_date
         )
-        if not df.empty and df["Lead Time"].sum() > 0:
+        if (
+            not df.empty
+            and (
+                df["Mean Lead Time"].sum() > 0
+                or df["Median Lead Time"].sum() > 0
+            )
+        ):
             plot = self._create_plot(
                 df,
                 title=title,
