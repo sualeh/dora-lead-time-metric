@@ -98,7 +98,7 @@ CREATE VIEW lead_times AS
 -- Stories without any associated pull request are excluded by design:
 -- lead time is measured via commits, so only stories linked to at least
 -- one PR contribute to the metric.
-SELECT
+SELECT DISTINCT
 	releases.id
 	AS release_id,
 	releases.release_date,
