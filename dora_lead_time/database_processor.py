@@ -449,7 +449,7 @@ class DatabaseProcessor:
                 WHERE
                     releases_stories.story_id IS NULL
                     AND releases_without_stories.release_id IS NULL
-                    AND releases.release_date < date('now')
+                    AND releases.release_date < date('now', 'localtime')
                 """
             )
 

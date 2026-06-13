@@ -7,6 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import sqlite3
 
+from dora_lead_time.database_processor import DatabaseProcessor
 from dora_lead_time.lead_time_report import LeadTimeReport, LeadTimeResult
 
 
@@ -72,6 +73,96 @@ def test_calculate_lead_time_error(mock_connect, tmp_path):
 
     assert result.average_lead_time == 0.0
     assert result.number_of_releases == 0
+
+
+def test_calculate_lead_time_deduplicates_same_pr_linked_to_two_stories(
+    tmp_path,
+):
+    """A PR linked via two stories in one release should count once."""
+    db_path = tmp_path / "lead_time_dedup.db"
+
+    processor = DatabaseProcessor(str(db_path))
+    processor.create_schema()
+
+    conn = sqlite3.connect(str(db_path))
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        INSERT INTO projects (
+            id, project_internal_id, project_key, project_title, project_type
+        )
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (1, "P-1", "TEST", "Test Project", "software"),
+    )
+    cursor.execute(
+        """
+        INSERT INTO releases (
+            id, release_internal_id, release_title, release_description,
+            release_date, project_id
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (1, "R-1", "Release 1", "", "2024-01-10", 1),
+    )
+
+    cursor.executemany(
+        """
+        INSERT INTO stories (
+            id, story_internal_id, story_key, story_title, story_type,
+            story_created, story_resolved
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (1, "S-1", "TEST-1", "Story 1", "Story", "2024-01-01", "2024-01-09"),
+            (2, "S-2", "TEST-2", "Story 2", "Story", "2024-01-02", "2024-01-09"),
+        ],
+    )
+    cursor.executemany(
+        """
+        INSERT INTO releases_stories (release_id, story_id)
+        VALUES (?, ?)
+        """,
+        [(1, 1), (1, 2)],
+    )
+
+    cursor.executemany(
+        """
+        INSERT INTO pull_requests (
+            id, pr_title, pr_owner, pr_repository, pr_number, pr_open, pr_close,
+            commit_count, earliest_commit_date, latest_commit_date
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (1, "Shared PR", "acme", "repo", "1", "2024-01-03", "2024-01-08",
+             2, "2024-01-05", "2024-01-08"),
+            (2, "Unique PR", "acme", "repo", "2", "2024-01-01", "2024-01-09",
+             3, "2024-01-01", "2024-01-09"),
+        ],
+    )
+    cursor.executemany(
+        """
+        INSERT INTO stories_pull_requests (story_id, pr_id)
+        VALUES (?, ?)
+        """,
+        [(1, 1), (2, 1), (1, 2)],
+    )
+
+    conn.commit()
+    conn.close()
+
+    report = LeadTimeReport(str(db_path))
+    result = report.calculate_lead_time(
+        ["TEST"], date(2024, 1, 1), date(2024, 1, 31)
+    )
+
+    # PR 1 lead time = 5 days, PR 2 lead time = 9 days.
+    # Expected deduped average is (5 + 9) / 2 = 7.
+    assert result.average_lead_time == pytest.approx(7.0)
+    assert result.number_of_releases == 2
 
 
 @patch.object(LeadTimeReport, 'calculate_lead_time')
