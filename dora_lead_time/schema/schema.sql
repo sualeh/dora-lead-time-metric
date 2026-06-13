@@ -162,7 +162,7 @@ DROP VIEW IF EXISTS progress;
 CREATE VIEW progress AS
 SELECT
   1 as id,
-  'stories remaining' AS type,
+  'releases waiting for stories' AS type,
   COUNT(*) AS count
 FROM
   releases
@@ -177,7 +177,7 @@ WHERE
 UNION
 SELECT
   2 as id,
-  'PRs waiting' AS type,
+  'stories waiting for pull requests' AS type,
   COUNT(*) AS count
 FROM
   stories
@@ -192,7 +192,7 @@ WHERE
 UNION
 SELECT
   3 as id,
-  'partial PRs' AS type,
+  'pull requests waiting for full details' AS type,
   COUNT(*) AS count
 FROM
   pull_requests
