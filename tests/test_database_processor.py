@@ -77,9 +77,9 @@ def test_create_schema(db_processor):
     )
     progress_rows = cursor.fetchall()
     assert len(progress_rows) == 3
-    assert progress_rows[0][1] == "stories remaining"
-    assert progress_rows[1][1] == "PRs waiting"
-    assert progress_rows[2][1] == "partial PRs"
+    assert progress_rows[0][1] == "releases waiting for stories"
+    assert progress_rows[1][1] == "stories waiting for pull requests"
+    assert progress_rows[2][1] == "pull requests waiting for full details"
     assert progress_rows[0][2] == 0
     assert progress_rows[1][2] == 0
     assert progress_rows[2][2] == 0
