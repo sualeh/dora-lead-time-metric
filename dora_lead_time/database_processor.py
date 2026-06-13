@@ -907,6 +907,62 @@ class DatabaseProcessor:
         except DatabaseOperationError:
             logger.error("Failed to retrieve summary data")
 
+    def print_progress(self):
+        """Print progress data from the database.
+
+        Displays counts of work remaining while building the database:
+        - Releases with stories still to retrieve
+        - Stories with pull requests still to retrieve
+        - Pull requests waiting for full details
+
+        Raises:
+            Exception: If there's an error querying the database
+        """
+        database_name = (
+            self.sqlite_path
+            if self.sqlite_path == ":memory:"
+            else pathlib.Path(self.sqlite_path).name
+        )
+
+        try:
+            with self._transaction("print progress") as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        type,
+                        count
+                    FROM
+                        progress
+                    ORDER BY
+                        id
+                    """
+                )
+
+                rows = cursor.fetchall()
+
+                if not rows:
+                    logger.info(
+                        "No progress data available in database: %s",
+                        database_name,
+                    )
+                    return
+
+                progress_lines = [
+                    f"Database: {database_name}",
+                    "Data progress:",
+                ]
+                for row in rows:
+                    progress_type, count = row
+                    progress_lines.append(
+                        f"    - {'{:5,}'.format(count)}"
+                        f" {'{:20}'.format(progress_type)}"
+                    )
+
+                logger.info("\n".join(progress_lines))
+
+        except DatabaseOperationError:
+            logger.error("Failed to retrieve progress data")
+
 
 def main():
     """Main entry point of the application."""
