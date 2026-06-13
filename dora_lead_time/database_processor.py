@@ -4,6 +4,7 @@ import logging
 import os
 import pathlib
 import sqlite3
+from contextlib import contextmanager
 from datetime import date, datetime
 from dora_lead_time.models import (
     PullRequestIdentifier,
@@ -11,10 +12,6 @@ from dora_lead_time.models import (
     StoryInRelease,
 )
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s `%(funcName)s` %(levelname)s:\n  %(message)s"
-)
 logger = logging.getLogger(__name__)
 
 PULL_REQUEST_BATCH_SIZE = 100
@@ -102,6 +99,39 @@ class DatabaseProcessor:
 
         return conn
 
+    @contextmanager
+    def _transaction(self, operation: str, check_exists: bool = True):
+        """Context manager for database transactions.
+
+        Handles connection setup, commit, rollback, and cleanup for all
+        database operations. Ensures proper error handling and resource
+        management.
+
+        Args:
+            operation: A description of the operation being performed
+                (used in error messages and logging).
+            check_exists: If True, verify the database file exists before
+                connecting. Defaults to True. Set to False for schema
+                creation.
+
+        Yields:
+            sqlite3.Cursor: A database cursor for executing SQL statements.
+
+        Raises:
+            DatabaseOperationError: If the operation encounters a database
+                error.
+        """
+        conn = make_sqlite_connection(self.sqlite_path, check_exists)
+        try:
+            yield conn.cursor()
+            conn.commit()
+        except (sqlite3.OperationalError, sqlite3.DatabaseError, ValueError) as e:
+            conn.rollback()
+            logger.error("%s: %s", operation, e)
+            raise DatabaseOperationError(operation) from e
+        finally:
+            conn.close()
+
     def retrieve_all_projects(self) -> list[Project]:
         """Gets all projects from the database.
 
@@ -109,59 +139,37 @@ class DatabaseProcessor:
             list[Project]: List of Project named tuples
 
         Raises:
-            Exception: If there's an error querying the database
+            DatabaseOperationError: If there's an error querying the database
         """
-        conn = None
         projects = []
-
         try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-
-            cursor.execute(
-                """
-                SELECT
-                    id,
-                    project_internal_id,
-                    project_key,
-                    project_title,
-                    project_type
-                FROM
-                    projects
-                """
-            )
-
-            rows = cursor.fetchall()
-
-            projects = [
-                Project(
-                    id=row[0],
-                    project_internal_id=row[1],
-                    project_key=row[2],
-                    project_title=row[3],
-                    project_type=row[4]
+            with self._transaction("retrieve all projects") as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        id,
+                        project_internal_id,
+                        project_key,
+                        project_title,
+                        project_type
+                    FROM
+                        projects
+                    """
                 )
-                for row in rows
-            ]
-
-            logger.debug("Retrieved %d projects", len(projects))
-        except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
-            logger.error(
-                """
-                %s
-                Could not retrieve projects from the database
-                """,
-                e
-            )
-            if conn:
-                conn.rollback()
-            raise DatabaseOperationError(
-                "Could not retrieve projects from the database"
-            ) from e
-        finally:
-            if conn:
-                conn.close()
-
+                rows = cursor.fetchall()
+                projects = [
+                    Project(
+                        id=row[0],
+                        project_internal_id=row[1],
+                        project_key=row[2],
+                        project_title=row[3],
+                        project_type=row[4]
+                    )
+                    for row in rows
+                ]
+                logger.debug("Retrieved %d projects", len(projects))
+        except DatabaseOperationError:
+            raise
         return projects
 
     def create_schema(self):
@@ -179,13 +187,7 @@ class DatabaseProcessor:
         Raises:
             Exception: If there's an error creating the schema
         """
-        conn = None
-        try:
-            # When creating a schema,
-            # we don't want to check if the database exists
-            conn = self._get_connection(check_exists=False)
-            cursor = conn.cursor()
-
+        with self._transaction("create schema", check_exists=False) as cursor:
             schema_dir = pathlib.Path(__file__).parent / "schema"
             schema_dir.mkdir(exist_ok=True)
             schema_script_path = schema_dir / "schema.sql"
@@ -199,23 +201,8 @@ class DatabaseProcessor:
                 schema_script = f.read()
 
             cursor.executescript(schema_script)
-            conn.commit()
 
             logger.info("Schema created")
-        except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
-            logger.error(
-                """
-                Could not create schema
-                %s
-                """,
-                e
-            )
-            if conn:
-                conn.rollback()
-            raise DatabaseOperationError("Could not create schema") from e
-        finally:
-            if conn:
-                conn.close()
 
     def save_projects(self, projects):
         """Save projects to the database.
@@ -226,11 +213,7 @@ class DatabaseProcessor:
         Raises:
             Exception: If there's an error saving projects to the database
         """
-        conn = None
-        try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-
+        with self._transaction("save projects") as cursor:
             # Create new list of tuples without the id field
             projects = [project[1:] for project in projects]
 
@@ -248,22 +231,6 @@ class DatabaseProcessor:
             )
             logger.info("Inserted %d projects", cursor.rowcount)
 
-            conn.commit()
-        except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
-            logger.error(
-                """
-                %s
-                Could not save projects
-                """,
-                e
-            )
-            if conn:
-                conn.rollback()
-            raise DatabaseOperationError("Could not save projects") from e
-        finally:
-            if conn:
-                conn.close()
-
     def update_project_types(
         self,
         project_keys: list[str],
@@ -278,11 +245,7 @@ class DatabaseProcessor:
         Raises:
             Exception: If there's an error updating project types
         """
-        conn = None
-        try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-
+        with self._transaction("update project types") as cursor:
             params = [(project_type, key) for key in project_keys]
 
             cursor.executemany(
@@ -295,23 +258,11 @@ class DatabaseProcessor:
             )
 
             affected_rows = cursor.rowcount
-            conn.commit()
             logger.info(
                 "Updated project type to '%s' for %d projects",
                 project_type,
                 affected_rows,
             )
-
-        except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
-            logger.error("Database error while updating project types: %s", e)
-            if conn:
-                conn.rollback()
-            raise DatabaseOperationError(
-                "Could not update project types"
-            ) from e
-        finally:
-            if conn:
-                conn.close()
 
     def save_releases(
         self,
@@ -325,16 +276,12 @@ class DatabaseProcessor:
         Raises:
             Exception: If there's an error saving releases to the database
         """
-        conn = None
-        try:
-            # Create new list of tuples without the id field
-            releases = [release[1:] for release in releases]
+        # Create new list of tuples without the id field
+        releases = [release[1:] for release in releases]
 
-            logger.info("Saving %d releases", len(releases))
+        logger.info("Saving %d releases", len(releases))
 
-            conn = self._get_connection()
-            cursor = conn.cursor()
-
+        with self._transaction("save releases") as cursor:
             cursor.execute(
                 """
                 DROP TABLE IF EXISTS stage_releases
@@ -400,27 +347,6 @@ class DatabaseProcessor:
                 """
             )
 
-            conn.commit()
-
-        except (
-            sqlite3.OperationalError,
-            sqlite3.DatabaseError,
-            ValueError
-        ) as e:
-            logger.error(
-                """
-                %s
-                Could not save releases.
-                """,
-                e
-            )
-            if conn:
-                conn.rollback()
-            raise DatabaseOperationError("Could not save releases") from e
-        finally:
-            if conn:
-                conn.close()
-
     def retrieve_releases_without_stories(self) -> list[str]:
         """Get releases without associated stories from the database.
 
@@ -431,11 +357,7 @@ class DatabaseProcessor:
         Raises:
             Exception: If there's an error querying the database
         """
-        conn = None
-        try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-
+        with self._transaction("retrieve releases without stories") as cursor:
             cursor.execute(
                 """
                 SELECT
@@ -456,23 +378,6 @@ class DatabaseProcessor:
             release_ids = cursor.fetchall()
             release_ids = [release_id[0] for release_id in release_ids]
             logger.info("%d releases without stories", len(release_ids))
-        except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
-            logger.error(
-                """
-                %s
-                Could not get releases without stories
-                """,
-                e
-            )
-            release_ids = []
-            if conn:
-                conn.rollback()
-            raise DatabaseOperationError(
-                "Could not get releases without stories"
-            ) from e
-        finally:
-            if conn:
-                conn.close()
 
         return release_ids
 
@@ -492,11 +397,7 @@ class DatabaseProcessor:
         if not release_internal_ids:
             return
 
-        conn = None
-        try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-
+        with self._transaction("save releases without stories") as cursor:
             cursor.executemany(
                 """
                 INSERT OR IGNORE INTO releases_without_stories (
@@ -513,24 +414,6 @@ class DatabaseProcessor:
                 cursor.rowcount,
             )
 
-            conn.commit()
-        except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
-            logger.error(
-                """
-                %s
-                Could not save releases without stories markers
-                """,
-                e,
-            )
-            if conn:
-                conn.rollback()
-            raise DatabaseOperationError(
-                "Could not save releases without stories markers"
-            ) from e
-        finally:
-            if conn:
-                conn.close()
-
     def save_stories(self, stories: list[StoryInRelease]) -> None:
         """Saves stories to the database.
 
@@ -542,13 +425,9 @@ class DatabaseProcessor:
         Raises:
             Exception: If there's an error saving stories to the database
         """
-        conn = None
-        try:
-            logger.info("Saving %d story-release pairs", len(stories))
+        logger.info("Saving %d story-release pairs", len(stories))
 
-            conn = self._get_connection()
-            cursor = conn.cursor()
-
+        with self._transaction("save stories") as cursor:
             cursor.execute("DROP TABLE IF EXISTS stage_stories")
 
             cursor.execute(
@@ -651,26 +530,6 @@ class DatabaseProcessor:
 
             cursor.execute("DROP TABLE IF EXISTS stage_stories")
 
-            conn.commit()
-        except (
-            sqlite3.OperationalError,
-            sqlite3.DatabaseError,
-            ValueError
-        ) as e:
-            logger.error(
-                """
-                %s
-                Could not save stories
-                """,
-                e
-            )
-            if conn:
-                conn.rollback()
-            raise DatabaseOperationError("Could not save stories") from e
-        finally:
-            if conn:
-                conn.close()
-
     def retrieve_stories_without_pull_requests(
         self,
         limit: int = PULL_REQUEST_BATCH_SIZE,
@@ -689,10 +548,7 @@ class DatabaseProcessor:
         Raises:
             Exception: If there's an error querying the database
         """
-        conn = None
-        try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
+        with self._transaction("retrieve stories without pull requests") as cursor:
             query = f"""
                 SELECT
                     DISTINCT stories.story_key,
@@ -716,23 +572,6 @@ class DatabaseProcessor:
 
             stories = cursor.fetchall()
             logger.info("%d stories without PRs", len(stories))
-        except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
-            logger.error(
-                """
-                %s
-                Could not load stories without pull requests
-                """,
-                e
-            )
-            stories = []
-            if conn:
-                conn.rollback()
-            raise DatabaseOperationError(
-                "Could not load stories without pull requests"
-            ) from e
-        finally:
-            if conn:
-                conn.close()
 
         return stories
 
@@ -748,32 +587,28 @@ class DatabaseProcessor:
         Raises:
             Exception: If there's an error saving data to the database
         """
-        conn = None
-        try:
-            zero_pr_story_keys = [
-                story
-                for story, urls in stories_pull_requests_map.items()
-                if not urls
-            ]
-            stories_pull_requests = [
-                (
-                    story,
-                    *url[1:]
-                )
-                for story, urls in stories_pull_requests_map.items()
-                for url in urls
-            ]
-            total_prs = len(stories_pull_requests)
-
-            logger.info(
-                "Saving %d pull requests across %d stories",
-                total_prs,
-                len(stories_pull_requests_map),
+        zero_pr_story_keys = [
+            story
+            for story, urls in stories_pull_requests_map.items()
+            if not urls
+        ]
+        stories_pull_requests = [
+            (
+                story,
+                *url[1:]
             )
+            for story, urls in stories_pull_requests_map.items()
+            for url in urls
+        ]
+        total_prs = len(stories_pull_requests)
 
-            conn = self._get_connection()
-            cursor = conn.cursor()
+        logger.info(
+            "Saving %d pull requests across %d stories",
+            total_prs,
+            len(stories_pull_requests_map),
+        )
 
+        with self._transaction("save story pull requests") as cursor:
             cursor.execute(
                 """
                 DROP TABLE IF EXISTS stage_stories_pull_requests
@@ -876,28 +711,6 @@ class DatabaseProcessor:
                     cursor.rowcount,
                 )
 
-            conn.commit()
-        except (
-            sqlite3.OperationalError,
-            sqlite3.DatabaseError,
-            ValueError
-        ) as e:
-            logger.error(
-                """
-                %s
-                Could not save stories to PR URL mapping
-                """,
-                e
-            )
-            if conn:
-                conn.rollback()
-            raise DatabaseOperationError(
-                "Could not save stories to PR URL mapping"
-            ) from e
-        finally:
-            if conn:
-                conn.close()
-
     def retrieve_pull_requests_without_details(
         self,
         limit: int = PULL_REQUEST_BATCH_SIZE,
@@ -914,10 +727,7 @@ class DatabaseProcessor:
         Raises:
             Exception: If there's an error querying the database
         """
-        conn = None
-        try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
+        with self._transaction("retrieve pull requests without details") as cursor:
             query = f"""
                 SELECT
                     pull_requests.id,
@@ -948,24 +758,6 @@ class DatabaseProcessor:
                 for row in rows
             ]
             logger.info("%d PRs without details", len(pull_requests))
-        except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
-            logger.error(
-                """
-                %s
-                Could not load PRs from the database
-                """,
-                e
-            )
-            pull_requests = []
-            if conn:
-                conn.rollback()
-            raise DatabaseOperationError(
-                "Could not load PRs from the database"
-            ) from e
-        finally:
-            if conn:
-                # Close the connection
-                conn.close()
 
         return pull_requests
 
@@ -986,16 +778,12 @@ class DatabaseProcessor:
         if pull_request_fetch_failures_404 is None:
             pull_request_fetch_failures_404 = []
 
-        conn = None
-        try:
-            logger.info(
-                "Saving details for %d pull requests",
-                len(pull_request_details)
-            )
+        logger.info(
+            "Saving details for %d pull requests",
+            len(pull_request_details)
+        )
 
-            conn = self._get_connection()
-            cursor = conn.cursor()
-
+        with self._transaction("save pull request details") as cursor:
             # Update to use the fields from PullRequest
             cursor.executemany(
                 """
@@ -1037,28 +825,6 @@ class DatabaseProcessor:
                     len(pull_request_fetch_failures_404)
                 )
 
-            conn.commit()
-        except (
-            sqlite3.OperationalError,
-            sqlite3.DatabaseError,
-            ValueError
-        ) as e:
-            logger.error(
-                """
-                %s
-                Could not update PR details
-                """,
-                e
-            )
-            if conn:
-                conn.rollback()
-            raise DatabaseOperationError(
-                "Could not update PR details"
-            ) from e
-        finally:
-            if conn:
-                conn.close()
-
     def retrieve_projects_by_type(
         self,
         project_types: list[str] = None
@@ -1093,61 +859,53 @@ class DatabaseProcessor:
         Raises:
             Exception: If there's an error querying the database
         """
-        conn = None
+        database_name = (
+            self.sqlite_path
+            if self.sqlite_path == ":memory:"
+            else pathlib.Path(self.sqlite_path).name
+        )
+
         try:
-            database_name = (
-                self.sqlite_path
-                if self.sqlite_path == ":memory:"
-                else pathlib.Path(self.sqlite_path).name
-            )
-
-            conn = self._get_connection()
-            cursor = conn.cursor()
-
-            cursor.execute(
-                """
-                SELECT
-                    type,
-                    count,
-                    earliest_date,
-                    latest_date
-                FROM
-                    summary
-                ORDER BY
-                    id
-                """
-            )
-
-            rows = cursor.fetchall()
-
-            if not rows:
-                logger.info(
-                    "No summary data available in database: %s",
-                    database_name,
-                )
-                return
-
-            summary_lines = [
-                f"Database: {database_name}",
-                "Data summary:",
-            ]
-            for row in rows:
-                entity_type, count, earliest_date, latest_date = row
-                summary_lines.append(
-                    f"    - {'{:5,}'.format(count)}"
-                    f" {'{:15}'.format(entity_type)}"
-                    f" from {earliest_date} to {latest_date}"
+            with self._transaction("print summary") as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        type,
+                        count,
+                        earliest_date,
+                        latest_date
+                    FROM
+                        summary
+                    ORDER BY
+                        id
+                    """
                 )
 
-            logger.info("\n".join(summary_lines))
+                rows = cursor.fetchall()
 
-        except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
-            logger.error("Failed to retrieve summary data: %s", e)
-            if conn:
-                conn.rollback()
-        finally:
-            if conn:
-                conn.close()
+                if not rows:
+                    logger.info(
+                        "No summary data available in database: %s",
+                        database_name,
+                    )
+                    return
+
+                summary_lines = [
+                    f"Database: {database_name}",
+                    "Data summary:",
+                ]
+                for row in rows:
+                    entity_type, count, earliest_date, latest_date = row
+                    summary_lines.append(
+                        f"    - {'{:5,}'.format(count)}"
+                        f" {'{:15}'.format(entity_type)}"
+                        f" from {earliest_date} to {latest_date}"
+                    )
+
+                logger.info("\n".join(summary_lines))
+
+        except DatabaseOperationError:
+            logger.error("Failed to retrieve summary data")
 
 
 def main():
