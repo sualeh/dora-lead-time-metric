@@ -5,6 +5,7 @@ from unittest.mock import patch, MagicMock
 from datetime import date
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 import sqlite3
 
 from dora_lead_time.database_processor import DatabaseProcessor
@@ -195,7 +196,7 @@ def test_monthly_lead_time_report(mock_calculate_lead_time, tmp_path):
 
 
 def test_show_plot(tmp_path):
-    """Test _create_plot returns a non-None plot object."""
+    """Test _create_plot returns a matplotlib Figure and no extra figure."""
     data = {
         "Month": ["Jan", "Feb", "Mar", "Apr"],
         "Lead Time": [10, 15, 12, 8],
@@ -207,8 +208,9 @@ def test_show_plot(tmp_path):
     db_path = tmp_path / "test.db"
     db_path.touch()
     report = LeadTimeReport(str(db_path))
-    plot = report._create_plot(df, title="Test Plot")
-    assert plot is not None
+    fig = report._create_plot(df, title="Test Plot")
+    assert isinstance(fig, Figure)
+    assert len(plt.get_fignums()) == 1
     plt.close('all')
 
 

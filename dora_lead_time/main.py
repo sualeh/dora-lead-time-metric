@@ -8,6 +8,7 @@ import argparse
 from datetime import date, datetime
 import pathlib
 from typing import NamedTuple
+import matplotlib.pyplot as plt
 from dotenv import load_dotenv
 from dora_lead_time.database_processor import (
     DatabaseOperationError,
@@ -347,23 +348,23 @@ def _save_lead_time_chart(
 
     """
 
-    plot = lead_time_report.create_lead_time_chart(
+    fig = lead_time_report.create_lead_time_chart(
         project_keys,
         start_date,
         end_date,
         title
     )
-    if plot is None:
+    if fig is None:
         return
 
     image_format = CHART_IMAGE_FORMAT
     # Save plot
-    plot.savefig(
+    fig.savefig(
         file_path.with_suffix(f".{image_format}"),
         dpi=CHART_IMAGE_DPI,
         format=image_format
     )
-    plot.close()  # Close plot to free memory
+    plt.close(fig)  # Close figure to free memory
     logger.info("Saved '%s' to %s", title, file_path)
 
 

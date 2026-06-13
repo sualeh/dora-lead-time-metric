@@ -8,6 +8,7 @@ import sqlite3
 import pandas as pd
 from pandas import DataFrame
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 import numpy as np
 from dora_lead_time.database_processor import make_sqlite_connection
 from dora_lead_time.date_utility import DateUtility
@@ -214,19 +215,16 @@ class LeadTimeReport:
         df: pd.DataFrame,
         title: str = "",
         footer: str = ""
-    ) -> plt.Figure:
+    ) -> Figure:
         """
         Create a plot of lead time data.
 
-        Generates a matplotlib plot visualization of the lead time data,
-        optionally including trend lines.
+        Generates a matplotlib plot visualization of the lead time data.
 
         Args:
             df: A pandas DataFrame with at least one column for the x-axis
                 (typically "Month") and one or more data series columns.
             title: Optional title for the plot. Defaults to empty string.
-            show_trend: Whether to display trend lines for each series.
-                Defaults to False.
 
         Returns:
             A matplotlib Figure object representing the plot.
@@ -235,8 +233,7 @@ class LeadTimeReport:
 
         # plt.style.use("fivethirtyeight")
 
-        plt.figure(figsize=(16, 9))
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(16, 9))
         fig.patch.set_facecolor('whitesmoke')
         ax.set_facecolor('whitesmoke')
         ax.spines['top'].set_visible(False)
@@ -247,9 +244,9 @@ class LeadTimeReport:
         ax.tick_params(axis='both', colors='gray')
 
         xlabel = df.columns[0]
-        plt.xlabel(xlabel, color='gray')
-        plt.ylabel("Values", color='gray')
-        plt.title(title, pad=20)
+        ax.set_xlabel(xlabel, color='gray')
+        ax.set_ylabel("Values", color='gray')
+        ax.set_title(title, pad=20)
 
         for idx, column in enumerate(df.columns[1:]):
             x = np.arange(len(df[xlabel]))
@@ -259,7 +256,7 @@ class LeadTimeReport:
                 linestyle = "-"
             else:
                 linestyle = "--"
-            plt.plot(
+            ax.plot(
                 x, y,
                 label=column,
                 linestyle=linestyle, marker="o",
@@ -267,8 +264,9 @@ class LeadTimeReport:
             )
 
         x = np.arange(len(df[xlabel]))
-        plt.xticks(x, df[xlabel], rotation=45)
-        legend = plt.legend(
+        ax.set_xticks(x)
+        ax.set_xticklabels(df[xlabel], rotation=45)
+        legend = ax.legend(
             fontsize=9,
             facecolor="whitesmoke",
             frameon=False
@@ -277,16 +275,16 @@ class LeadTimeReport:
             text.set_color("gray")
 
         # Add footer
-        plt.figtext(
+        fig.text(
             0.5, 0.1,  # x, y position (centered, bottom)
             footer,
             ha='center',  # horizontal alignment
             fontsize=9
         )
         # Add extra space at the bottom for the footer
-        plt.subplots_adjust(bottom=0.3)
+        fig.subplots_adjust(bottom=0.3)
 
-        return plt
+        return fig
 
     def create_lead_time_chart(
         self,
@@ -294,7 +292,7 @@ class LeadTimeReport:
         start_date: date,
         end_date: date,
         title: str
-    ) -> plt.Figure:
+    ) -> Figure | None:
         """Generate and save a lead time chart.
 
         Args:
