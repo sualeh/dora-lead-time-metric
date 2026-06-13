@@ -149,7 +149,18 @@ FROM
 UNION
 SELECT
   3 as id,
-  'pull_requests' AS type,
+  'partial pull requests' AS type,
+  COUNT(*) AS count,
+  MIN(pr_open) AS earliest_date,
+  MAX(pr_close) AS latest_date
+FROM
+  pull_requests
+WHERE
+  pr_title IS NULL
+UNION
+SELECT
+  4 as id,
+  'pull requests' AS type,
   COUNT(*) AS count,
   MIN(pr_open) AS earliest_date,
   MAX(pr_close) AS latest_date
