@@ -200,13 +200,13 @@ def test_monthly_lead_time_report(mock_load_lead_times, tmp_path):
 @patch.object(LeadTimeReport, '_create_plot')
 @patch.object(LeadTimeReport, 'monthly_lead_time_report')
 @patch.object(LeadTimeReport, 'calculate_lead_time')
-def test_create_lead_time_chart_uses_median_first_summary(
+def test_create_lead_time_chart_uses_median_caption_and_summary(
     mock_calculate_lead_time,
     mock_monthly_lead_time_report,
     mock_create_plot,
     tmp_path,
 ):
-    """Test chart summary text places median before mean."""
+    """Test chart caption and footer use the simplified median-first text."""
     mock_calculate_lead_time.return_value = LeadTimeResult(
         project_keys=["TEST1"],
         start_date=date(2023, 1, 1),
@@ -232,9 +232,11 @@ def test_create_lead_time_chart_uses_median_first_summary(
     )
 
     assert mock_create_plot.call_count == 1
+    assert mock_create_plot.call_args.kwargs["title"] == (
+        "Lead Time between Jan 1, 2023 to Jan 31, 2023"
+    )
     assert mock_create_plot.call_args.kwargs["footer"] == (
-        "Median lead time: 9 days · Mean lead time: 10 days · "
-        "5 pull requests"
+        "Median lead time: 9 days · 5 pull requests"
     )
 
 

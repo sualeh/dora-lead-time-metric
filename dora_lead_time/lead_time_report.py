@@ -151,6 +151,11 @@ class LeadTimeReport:
                 pull_request_count=0,
             )
 
+    @staticmethod
+    def _format_report_date(value: date) -> str:
+        """Format a date for chart captions."""
+        return value.strftime("%b %d, %Y").replace(" 0", " ")
+
     def monthly_lead_time_report(
         self, project_keys: list[str], start_date: date, end_date: date
     ) -> DataFrame:
@@ -345,10 +350,15 @@ class LeadTimeReport:
             start_date,
             end_date
         )
-        lead_time_summary = \
-            f"Median lead time: {round(lead_time.median_lead_time)} days · " \
-            f"Mean lead time: {round(lead_time.mean_lead_time)} days · " \
+        lead_time_summary = (
+            f"Median lead time: {round(lead_time.median_lead_time)} days · "
             f"{lead_time.pull_request_count} pull requests"
+        )
+        chart_caption = (
+            "Lead Time between "
+            f"{self._format_report_date(start_date)} to "
+            f"{self._format_report_date(end_date)}"
+        )
 
         # Generate monthly lead time report
         df = self.monthly_lead_time_report(
@@ -363,7 +373,7 @@ class LeadTimeReport:
         ):
             plot = self._create_plot(
                 df,
-                title=title,
+                title=chart_caption,
                 footer=lead_time_summary
             )
             return plot
