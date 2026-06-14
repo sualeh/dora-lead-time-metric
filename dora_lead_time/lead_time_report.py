@@ -165,8 +165,8 @@ class LeadTimeReport:
             end_date: End date for the report period (inclusive).
 
         Returns:
-            A pandas DataFrame with columns for Month, Mean Lead Time, and
-            Median Lead Time containing monthly metrics for the period.
+            A pandas DataFrame with columns for Month, Median Lead Time, and
+            Mean Lead Time containing monthly metrics for the period.
         """
         month_names = [
             f"{year}-{month}"
@@ -182,8 +182,8 @@ class LeadTimeReport:
             end_date
         )
         if lead_times_df.empty:
-            monthly_frame["Mean Lead Time"] = 0
             monthly_frame["Median Lead Time"] = 0
+            monthly_frame["Mean Lead Time"] = 0
             return monthly_frame
 
         lead_times_df["release_date"] = pd.to_datetime(
@@ -198,7 +198,7 @@ class LeadTimeReport:
         grouped_metrics = (
             lead_times_df
             .groupby("Month")["lead_time"]
-            .agg(["median","mean"])
+            .agg(["median", "mean"])
             .reset_index()
         )
         monthly_frame = monthly_frame.merge(
@@ -346,8 +346,8 @@ class LeadTimeReport:
             end_date
         )
         lead_time_summary = \
-            f"Mean lead time: {round(lead_time.mean_lead_time)} days · " \
             f"Median lead time: {round(lead_time.median_lead_time)} days · " \
+            f"Mean lead time: {round(lead_time.mean_lead_time)} days · " \
             f"{lead_time.pull_request_count} pull requests"
 
         # Generate monthly lead time report
