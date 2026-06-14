@@ -487,9 +487,15 @@ def main():
 
     config = load_lead_time_configuration()
 
+    if args.build and not config.build_database:
+        print(
+            "--build was requested, but BUILD_DATABASE is false. "
+            "Set BUILD_DATABASE=true to build the database."
+        )
+        sys.exit(1)
+
     # If build flag is set, create the database
-    build_database = args.build and config.build_database
-    if build_database:
+    if args.build and config.build_database:
         try:
             create_releases_database(config)
         except ConfigurationError as e:

@@ -4,6 +4,7 @@ from datetime import date, datetime as real_datetime
 from types import SimpleNamespace
 
 import pandas as pd
+import pytest
 
 from dora_lead_time import main
 
@@ -211,3 +212,26 @@ def test_create_releases_database_saves_stories_per_release(monkeypatch):
     assert print_calls[0] == "summary"
     assert print_calls[-1] == "summary"
     assert all(call == "progress" for call in print_calls[1:-1])
+
+
+def test_main_exits_when_build_disabled(monkeypatch, capsys):
+    """--build should fail loudly when BUILD_DATABASE is false."""
+    monkeypatch.setattr(
+        main,
+        "load_lead_time_configuration",
+        lambda: main.LeadTimeConfiguration(
+            sqlite_path="unused.db",
+            build_database=False,
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 1, 31),
+            github_org_tokens_map={},
+        ),
+    )
+    monkeypatch.setattr(main.sys, "argv", ["prog", "--build"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        main.main()
+
+    captured = capsys.readouterr()
+    assert excinfo.value.code == 1
+    assert "--build was requested" in captured.out
