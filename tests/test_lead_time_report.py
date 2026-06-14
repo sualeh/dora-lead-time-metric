@@ -191,7 +191,7 @@ def test_monthly_lead_time_report(mock_load_lead_times, tmp_path):
     assert isinstance(result_df, pd.DataFrame)
     assert len(result_df) == 3
     assert list(result_df.columns) == [
-        "Month", "Mean Lead Time", "Median Lead Time"
+        "Month", "Median Lead Time", "Mean Lead Time"
     ]
     assert list(result_df["Mean Lead Time"]) == [15, 7, 0]
     assert list(result_df["Median Lead Time"]) == [15, 7, 0]
