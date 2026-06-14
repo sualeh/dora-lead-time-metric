@@ -198,7 +198,7 @@ class LeadTimeReport:
         grouped_metrics = (
             lead_times_df
             .groupby("Month")["lead_time"]
-            .agg(["mean", "median"])
+            .agg(["median","mean"])
             .reset_index()
         )
         monthly_frame = monthly_frame.merge(
@@ -206,14 +206,14 @@ class LeadTimeReport:
             on="Month",
             how="left"
         ).fillna(0)
-        monthly_frame["Mean Lead Time"] = (
-            monthly_frame["mean"].round().astype(int)
-        )
         monthly_frame["Median Lead Time"] = (
             monthly_frame["median"].round().astype(int)
         )
+        monthly_frame["Mean Lead Time"] = (
+            monthly_frame["mean"].round().astype(int)
+        )
 
-        return monthly_frame[["Month", "Mean Lead Time", "Median Lead Time"]]
+        return monthly_frame[["Month", "Median Lead Time", "Mean Lead Time"]]
 
     def _load_lead_times_dataframe(
         self,
