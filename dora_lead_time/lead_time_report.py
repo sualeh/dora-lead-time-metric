@@ -151,6 +151,11 @@ class LeadTimeReport:
                 pull_request_count=0,
             )
 
+    @staticmethod
+    def _format_report_date(value: date) -> str:
+        """Format a date for chart captions."""
+        return value.strftime("%b %d, %Y").replace(" 0", " ")
+
     def monthly_lead_time_report(
         self, project_keys: list[str], start_date: date, end_date: date
     ) -> DataFrame:
@@ -165,8 +170,8 @@ class LeadTimeReport:
             end_date: End date for the report period (inclusive).
 
         Returns:
-            A pandas DataFrame with columns for Month, Mean Lead Time, and
-            Median Lead Time containing monthly metrics for the period.
+            A pandas DataFrame with columns for Month, Median Lead Time, and
+            Mean Lead Time containing monthly metrics for the period.
         """
         month_names = [
             f"{year}-{month}"
@@ -182,8 +187,8 @@ class LeadTimeReport:
             end_date
         )
         if lead_times_df.empty:
-            monthly_frame["Mean Lead Time"] = 0
             monthly_frame["Median Lead Time"] = 0
+            monthly_frame["Mean Lead Time"] = 0
             return monthly_frame
 
         lead_times_df["release_date"] = pd.to_datetime(
@@ -198,7 +203,7 @@ class LeadTimeReport:
         grouped_metrics = (
             lead_times_df
             .groupby("Month")["lead_time"]
-            .agg(["median","mean"])
+            .agg(["median", "mean"])
             .reset_index()
         )
         monthly_frame = monthly_frame.merge(
@@ -313,12 +318,18 @@ class LeadTimeReport:
             text.set_color("gray")
 
         # Add footer
-        fig.text(
-            0.5, 0.1,  # x, y position (centered, bottom)
-            footer,
-            ha='center',  # horizontal alignment
-            fontsize=9
-        )
+        footer_lines = footer.splitlines() if footer else []
+        for idx, line in enumerate(footer_lines):
+            is_primary = idx == 0
+            fig.text(
+                0.5,
+                0.1 - (idx * 0.035),  # x, y position (centered, bottom)
+                line,
+                ha='center',
+                fontsize=12 if is_primary else 9,
+                fontweight='bold' if is_primary else 'normal',
+                color='gray',
+            )
         # Add extra space at the bottom for the footer
         fig.subplots_adjust(bottom=0.3)
 
@@ -345,10 +356,17 @@ class LeadTimeReport:
             start_date,
             end_date
         )
-        lead_time_summary = \
-            f"Mean lead time: {round(lead_time.mean_lead_time)} days · " \
-            f"Median lead time: {round(lead_time.median_lead_time)} days · " \
-            f"{lead_time.pull_request_count} pull requests"
+        lead_time_summary = (
+            f"Lead Time {round(lead_time.median_lead_time)} days"
+            "\n"
+            f"{lead_time.pull_request_count} pull requests were considered "
+            "in the calculation"
+        )
+        chart_caption = (
+            "Lead Time between "
+            f"{self._format_report_date(start_date)} to "
+            f"{self._format_report_date(end_date)}"
+        )
 
         # Generate monthly lead time report
         df = self.monthly_lead_time_report(
@@ -363,7 +381,7 @@ class LeadTimeReport:
         ):
             plot = self._create_plot(
                 df,
-                title=title,
+                title=chart_caption,
                 footer=lead_time_summary
             )
             return plot
