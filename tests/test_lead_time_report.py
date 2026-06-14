@@ -236,7 +236,8 @@ def test_create_lead_time_chart_uses_median_caption_and_summary(
         "Lead Time between Jan 1, 2023 to Jan 31, 2023"
     )
     assert mock_create_plot.call_args.kwargs["footer"] == (
-        "Median lead time: 9 days · 5 pull requests"
+        "Lead Time 9 days\n"
+        "5 pull requests were considered in the calculation"
     )
 
 
@@ -253,12 +254,25 @@ def test_show_plot(tmp_path):
     db_path = tmp_path / "test.db"
     db_path.touch()
     report = LeadTimeReport(str(db_path))
-    fig = report._create_plot(df, title="Test Plot")
+    fig = report._create_plot(
+        df,
+        title="Test Plot",
+        footer=(
+            "Lead Time 9 days\n"
+            "5 pull requests were considered in the calculation"
+        ),
+    )
     assert isinstance(fig, Figure)
     assert len(plt.get_fignums()) == 1
     assert [
         text.get_text() for text in fig.axes[0].get_legend().get_texts()
     ] == ["Median Lead Time", "Mean Lead Time"]
+    assert [text.get_text() for text in fig.texts] == [
+        "Lead Time 9 days",
+        "5 pull requests were considered in the calculation",
+    ]
+    assert fig.texts[0].get_fontweight() == "bold"
+    assert fig.texts[0].get_fontsize() > fig.texts[1].get_fontsize()
     plt.close('all')
 
 

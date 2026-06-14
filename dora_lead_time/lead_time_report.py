@@ -318,12 +318,18 @@ class LeadTimeReport:
             text.set_color("gray")
 
         # Add footer
-        fig.text(
-            0.5, 0.1,  # x, y position (centered, bottom)
-            footer,
-            ha='center',  # horizontal alignment
-            fontsize=9
-        )
+        footer_lines = footer.splitlines() if footer else []
+        for idx, line in enumerate(footer_lines):
+            is_primary = idx == 0
+            fig.text(
+                0.5,
+                0.1 - (idx * 0.035),  # x, y position (centered, bottom)
+                line,
+                ha='center',
+                fontsize=12 if is_primary else 9,
+                fontweight='bold' if is_primary else 'normal',
+                color='gray',
+            )
         # Add extra space at the bottom for the footer
         fig.subplots_adjust(bottom=0.3)
 
@@ -351,8 +357,10 @@ class LeadTimeReport:
             end_date
         )
         lead_time_summary = (
-            f"Median lead time: {round(lead_time.median_lead_time)} days · "
-            f"{lead_time.pull_request_count} pull requests"
+            f"Lead Time {round(lead_time.median_lead_time)} days"
+            "\n"
+            f"{lead_time.pull_request_count} pull requests were considered "
+            "in the calculation"
         )
         chart_caption = (
             "Lead Time between "
