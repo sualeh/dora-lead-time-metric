@@ -232,7 +232,12 @@ class GitHubRequests:
             # Get earliest and latest commit date
             commit_dates = []
             for commit in commits:
-                commit_date = commit["commit"]["committer"]["date"]
+                commit_data = commit.get("commit", {})
+                author_date = commit_data.get("author", {}).get("date")
+                committer_date = commit_data.get("committer", {}).get("date")
+                commit_date = author_date or committer_date
+                if not commit_date:
+                    continue
                 commit_dates.append(
                     datetime.fromisoformat(commit_date.replace("Z", "+00:00"))
                     .date()

@@ -96,6 +96,9 @@ def test_get_pull_request_details(mock_get, github_client):
     mock_commits_data = [
         {
             "commit": {
+                "author": {
+                    "date": "2022-12-29T10:00:00Z"
+                },
                 "committer": {
                     "date": "2022-12-30T08:45:00Z"
                 }
@@ -103,6 +106,9 @@ def test_get_pull_request_details(mock_get, github_client):
         },
         {
             "commit": {
+                "author": {
+                    "date": "2023-01-02T09:30:00Z"
+                },
                 "committer": {
                     "date": "2023-01-01T09:30:00Z"
                 }
@@ -146,8 +152,8 @@ def test_get_pull_request_details(mock_get, github_client):
     assert pr.close_date == date(2023, 1, 2)
     assert pr.commit_count == 2
     assert pr.changed_files == 5
-    assert pr.earliest_commit_date == date(2022, 12, 30)
-    assert pr.latest_commit_date == date(2023, 1, 1)
+    assert pr.earliest_commit_date == date(2022, 12, 29)
+    assert pr.latest_commit_date == date(2023, 1, 2)
 
 
 @patch("requests.get")
@@ -162,6 +168,9 @@ def test_get_pull_request_details_paginates_commits(mock_get, github_client):
     first_page_commits = [
         {
             "commit": {
+                "author": {
+                    "date": "2022-12-29T08:45:00Z"
+                },
                 "committer": {
                     "date": "2022-12-30T08:45:00Z"
                 }
@@ -169,6 +178,9 @@ def test_get_pull_request_details_paginates_commits(mock_get, github_client):
         },
         {
             "commit": {
+                "author": {
+                    "date": "2023-01-02T09:30:00Z"
+                },
                 "committer": {
                     "date": "2023-01-01T09:30:00Z"
                 }
@@ -178,6 +190,9 @@ def test_get_pull_request_details_paginates_commits(mock_get, github_client):
     second_page_commits = [
         {
             "commit": {
+                "author": {
+                    "date": "2023-01-04T11:15:00Z"
+                },
                 "committer": {
                     "date": "2023-01-03T11:15:00Z"
                 }
@@ -223,8 +238,63 @@ def test_get_pull_request_details_paginates_commits(mock_get, github_client):
     pr = pr_details[0]
     assert pr.commit_count == 3
     assert pr.changed_files == 9
+    assert pr.earliest_commit_date == date(2022, 12, 29)
+    assert pr.latest_commit_date == date(2023, 1, 4)
+
+
+@patch("requests.get")
+def test_get_pull_request_details_uses_committer_date_fallback(
+    mock_get,
+    github_client,
+):
+    """Test fallback to committer date when author date is missing."""
+    mock_pr_data = {
+        "title": "Test PR",
+        "created_at": "2023-01-01T10:00:00Z",
+        "closed_at": "2023-01-02T15:30:00Z",
+    }
+    mock_commits_data = [
+        {
+            "commit": {
+                "author": {"date": "2023-01-02T09:30:00Z"},
+                "committer": {"date": "2023-01-01T09:30:00Z"},
+            }
+        },
+        {
+            "commit": {
+                "committer": {"date": "2022-12-30T08:45:00Z"}
+            }
+        },
+    ]
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if "pulls/123" in url and "/commits" not in url:
+            return MockResponse(mock_pr_data)
+        if "pulls/123/commits" in url:
+            return MockResponse(mock_commits_data)
+        return MockResponse({}, 404)
+
+    mock_get.side_effect = side_effect
+
+    pull_requests = [
+        PullRequestIdentifier(
+            id=1,
+            pr_owner="Org1",
+            pr_repository="test-repo",
+            pr_number="123"
+        )
+    ]
+
+    pr_details, pr_failures = github_client.get_pull_request_details(
+        pull_requests
+    )
+
+    assert len(pr_details) == 1
+    assert len(pr_failures) == 0
+    pr = pr_details[0]
     assert pr.earliest_commit_date == date(2022, 12, 30)
-    assert pr.latest_commit_date == date(2023, 1, 3)
+    assert pr.latest_commit_date == date(2023, 1, 2)
 
 
 @patch("requests.get")
