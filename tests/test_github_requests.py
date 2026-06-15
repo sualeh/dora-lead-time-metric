@@ -149,6 +149,81 @@ def test_get_pull_request_details(mock_get, github_client):
 
 
 @patch("requests.get")
+def test_get_pull_request_details_paginates_commits(mock_get, github_client):
+    """Test that commit pagination aggregates all pages."""
+    mock_pr_data = {
+        "title": "Test PR",
+        "created_at": "2023-01-01T10:00:00Z",
+        "closed_at": "2023-01-02T15:30:00Z",
+    }
+    first_page_commits = [
+        {
+            "commit": {
+                "committer": {
+                    "date": "2022-12-30T08:45:00Z"
+                }
+            }
+        },
+        {
+            "commit": {
+                "committer": {
+                    "date": "2023-01-01T09:30:00Z"
+                }
+            }
+        },
+    ]
+    second_page_commits = [
+        {
+            "commit": {
+                "committer": {
+                    "date": "2023-01-03T11:15:00Z"
+                }
+            }
+        },
+    ]
+
+    def side_effect(*args, **kwargs):
+        url = args[0]
+        if "pulls/123" in url and "/commits" not in url:
+            return MockResponse(mock_pr_data)
+        if "pulls/123/commits?per_page=100" in url:
+            return MockResponse(
+                first_page_commits,
+                headers={
+                    "Link": (
+                        "<https://api.github.com/repos/Org1/test-repo/pulls/123/"
+                        "commits?page=2>; rel=\"next\""
+                    )
+                },
+            )
+        if "pulls/123/commits?page=2" in url:
+            return MockResponse(second_page_commits)
+        return MockResponse({}, 404)
+
+    mock_get.side_effect = side_effect
+
+    pull_requests = [
+        PullRequestIdentifier(
+            id=1,
+            pr_owner="Org1",
+            pr_repository="test-repo",
+            pr_number="123"
+        )
+    ]
+
+    pr_details, pr_failures = github_client.get_pull_request_details(
+        pull_requests
+    )
+
+    assert len(pr_details) == 1
+    assert len(pr_failures) == 0
+    pr = pr_details[0]
+    assert pr.commit_count == 3
+    assert pr.earliest_commit_date == date(2022, 12, 30)
+    assert pr.latest_commit_date == date(2023, 1, 3)
+
+
+@patch("requests.get")
 def test_get_pull_request_details_api_error(mock_get, github_client):
     """Test that 404 HTTP errors on PR details are tracked as failures."""
     mock_get.return_value = MockResponse({}, 404)
