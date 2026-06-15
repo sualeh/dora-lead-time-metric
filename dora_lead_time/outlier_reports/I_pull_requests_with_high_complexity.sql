@@ -34,10 +34,6 @@ FROM
     ON pull_requests.id = recent_pull_request_ids.pr_id
 WHERE
   ln(1 + COALESCE(pull_requests.commit_count, 0)) +
-    2 * ln(1 + COALESCE(pull_requests.changed_files_count, 0)) > 6
+    2 * ln(1 + COALESCE(pull_requests.changed_files_count, 0)) > 7
 ORDER BY
-  complexity_score DESC,
-  pull_requests.pr_open DESC,
-  pull_requests.pr_owner,
-  pull_requests.pr_repository,
-  pull_requests.pr_number
+  complexity_score DESC
