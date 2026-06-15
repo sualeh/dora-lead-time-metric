@@ -56,6 +56,9 @@ def test_save_outlier_reports_uses_requested_order(tmp_path, monkeypatch):
         def report_pull_requests_in_multiple_stories(self):
             return self._df("pull_requests_in_multiple_stories")
 
+        def report_pull_requests_with_high_complexity(self):
+            return self._df("pull_requests_with_high_complexity")
+
         def report_stories_without_pull_requests(self):
             return self._df("stories_without_pull_requests")
 
@@ -88,6 +91,7 @@ def test_save_outlier_reports_uses_requested_order(tmp_path, monkeypatch):
         "releases_with_shared_stories",
         "pull_requests_with_old_commits",
         "pull_requests_in_multiple_stories",
+        "pull_requests_with_high_complexity",
         "stories_without_pull_requests",
         "counts_of_stories_without_pull_requests",
         "releases_without_stories",

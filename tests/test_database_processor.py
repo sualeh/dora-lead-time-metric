@@ -124,7 +124,7 @@ def test_create_schema(db_processor):
     pr_columns = {row[1]: row[2].upper() for row in cursor.fetchall()}
     assert pr_columns["pr_open"] == "DATE"
     assert pr_columns["pr_close"] == "DATE"
-    assert pr_columns["changed_files"] == "INTEGER"
+    assert pr_columns["changed_files_count"] == "INTEGER"
     assert pr_columns["earliest_commit_date"] == "DATE"
     assert pr_columns["latest_commit_date"] == "DATE"
 
@@ -231,7 +231,7 @@ def test_save_and_retrieve_pull_request_details(db_processor):
         open_date=date(2023, 1, 1),
         close_date=date(2023, 1, 2),
         commit_count=3,
-        changed_files=7,
+        changed_files_count=7,
         earliest_commit_date=date(2022, 12, 30),
         latest_commit_date=date(2023, 1, 1),
         owner="testorg",
@@ -263,7 +263,7 @@ def test_save_and_retrieve_pull_request_details(db_processor):
         SELECT
             pr_title,
             commit_count,
-            changed_files
+            changed_files_count
         FROM
             pull_requests
         WHERE

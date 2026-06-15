@@ -192,7 +192,7 @@ class OutlierReports:
             grouped by project and story type, including percentage
             calculations.
         """
-        sql = self._read_sql_file("I_counts_of_stories_without_pull_requests")
+        sql = self._read_sql_file("J_counts_of_stories_without_pull_requests")
         return self.execute_query(sql)
 
     def report_stories_without_pull_requests(self) -> pd.DataFrame:
@@ -206,7 +206,7 @@ class OutlierReports:
             DataFrame with detailed information about stories that don't have
             pull requests linked to them, including story type.
         """
-        sql = self._read_sql_file("I_stories_without_pull_requests")
+        sql = self._read_sql_file("J_stories_without_pull_requests")
         return self.execute_query(sql)
 
     def report_pull_requests_with_old_commits(self) -> pd.DataFrame:
@@ -251,6 +251,20 @@ class OutlierReports:
         sql = self._read_sql_file("H_pull_requests_in_multiple_stories")
         return self.execute_query(sql)
 
+    def report_pull_requests_with_high_complexity(self) -> pd.DataFrame:
+        """Get high-complexity pull requests in recently released work.
+
+        Identifies pull requests linked to releases in the last 60 days where
+        complexity is above threshold using:
+        ln(1 + commit_count) + 2 * ln(1 + changed_files_count).
+
+        Returns:
+            DataFrame with pull request identifiers, size metrics, and
+            computed complexity score for pull requests with score > 6.
+        """
+        sql = self._read_sql_file("I_pull_requests_with_high_complexity")
+        return self.execute_query(sql)
+
     def report_releases_without_stories(self) -> pd.DataFrame:
         """Get releases that do not have any linked stories.
 
@@ -261,7 +275,7 @@ class OutlierReports:
             DataFrame of releases with no linked stories, including project
             details.
         """
-        sql = self._read_sql_file("J_releases_without_stories")
+        sql = self._read_sql_file("K_releases_without_stories")
         return self.execute_query(sql)
 
 

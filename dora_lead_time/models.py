@@ -69,7 +69,7 @@ PullRequest = namedtuple(
         'open_date',
         'close_date',
         'commit_count',
-        'changed_files',
+        'changed_files_count',
         'earliest_commit_date',
         'latest_commit_date',
         'owner',

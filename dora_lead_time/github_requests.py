@@ -261,7 +261,7 @@ class GitHubRequests:
                 open_date=created_date,
                 close_date=closed_date,
                 commit_count=len(commits),
-                changed_files=pr_data.get("changed_files"),
+                changed_files_count=pr_data.get("changed_files"),
                 earliest_commit_date=earliest_commit_date,
                 latest_commit_date=latest_commit_date,
                 owner=owner,
