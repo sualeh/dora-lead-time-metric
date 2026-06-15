@@ -798,6 +798,7 @@ class DatabaseProcessor:
                     pr_open = ?,
                     pr_close = ?,
                     commit_count = ?,
+                    changed_files = ?,
                     earliest_commit_date = ?,
                     latest_commit_date = ?
                 WHERE
@@ -808,6 +809,7 @@ class DatabaseProcessor:
                     pr.open_date,
                     pr.close_date,
                     pr.commit_count,
+                    pr.changed_files,
                     pr.earliest_commit_date,
                     pr.latest_commit_date,
                     pr.id

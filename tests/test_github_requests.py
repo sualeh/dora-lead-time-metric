@@ -89,6 +89,7 @@ def test_get_pull_request_details(mock_get, github_client):
         "title": "Test PR",
         "created_at": "2023-01-01T10:00:00Z",
         "closed_at": "2023-01-02T15:30:00Z",
+        "changed_files": 5,
     }
 
     # Mock commit data
@@ -144,6 +145,7 @@ def test_get_pull_request_details(mock_get, github_client):
     assert pr.open_date == date(2023, 1, 1)
     assert pr.close_date == date(2023, 1, 2)
     assert pr.commit_count == 2
+    assert pr.changed_files == 5
     assert pr.earliest_commit_date == date(2022, 12, 30)
     assert pr.latest_commit_date == date(2023, 1, 1)
 
@@ -155,6 +157,7 @@ def test_get_pull_request_details_paginates_commits(mock_get, github_client):
         "title": "Test PR",
         "created_at": "2023-01-01T10:00:00Z",
         "closed_at": "2023-01-02T15:30:00Z",
+        "changed_files": 9,
     }
     first_page_commits = [
         {
@@ -219,6 +222,7 @@ def test_get_pull_request_details_paginates_commits(mock_get, github_client):
     assert len(pr_failures) == 0
     pr = pr_details[0]
     assert pr.commit_count == 3
+    assert pr.changed_files == 9
     assert pr.earliest_commit_date == date(2022, 12, 30)
     assert pr.latest_commit_date == date(2023, 1, 3)
 
@@ -254,6 +258,7 @@ def test_get_pull_request_details_commits_error(mock_get, github_client):
         "title": "Test PR",
         "created_at": "2023-01-01T10:00:00Z",
         "closed_at": "2023-01-02T15:30:00Z",
+        "changed_files": 0,
     }
 
     def side_effect(*args, **kwargs):
@@ -281,6 +286,7 @@ def test_get_pull_request_details_commits_error(mock_get, github_client):
     assert len(pr_failures) == 0
     pr = pr_details[0]
     assert pr.commit_count == 0
+    assert pr.changed_files == 0
     assert pr.earliest_commit_date is None
     assert pr.latest_commit_date is None
 
