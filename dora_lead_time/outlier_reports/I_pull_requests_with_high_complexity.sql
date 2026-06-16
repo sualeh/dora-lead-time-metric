@@ -25,15 +25,16 @@ SELECT
   pull_requests.pr_url,
   pull_requests.commit_count,
   pull_requests.changed_files_count,
-  ln(1 + COALESCE(pull_requests.commit_count, 0)) +
-    2 * ln(1 + COALESCE(pull_requests.changed_files_count, 0))
+  CAST(ROUND(
+    (SQRT(pull_requests.commit_count) * 3.0) +
+    (SQRT(pull_requests.changed_files_count) * 5.0))
+    AS INTEGER)
     AS complexity_score
 FROM
   pull_requests
   JOIN recent_pull_request_ids
     ON pull_requests.id = recent_pull_request_ids.pr_id
 WHERE
-  ln(1 + COALESCE(pull_requests.commit_count, 0)) +
-    2 * ln(1 + COALESCE(pull_requests.changed_files_count, 0)) > 7
+  complexity_score  > 29
 ORDER BY
   complexity_score DESC
