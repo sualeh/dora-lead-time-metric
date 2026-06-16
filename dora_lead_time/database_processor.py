@@ -185,7 +185,7 @@ class DatabaseProcessor:
         4. Pull requests contain commit information
 
         Raises:
-            Exception: If there's an error creating the schema
+            DatabaseOperationError: If there's an error creating the schema.
         """
         with self._transaction("create schema", check_exists=False) as cursor:
             schema_dir = pathlib.Path(__file__).parent / "schema"
@@ -211,7 +211,8 @@ class DatabaseProcessor:
             projects: List of project tuples to save
 
         Raises:
-            Exception: If there's an error saving projects to the database
+            DatabaseOperationError: If there's an error saving projects to
+                the database.
         """
         with self._transaction("save projects") as cursor:
             # Create new list of tuples without the id field
@@ -243,7 +244,7 @@ class DatabaseProcessor:
             project_type (str): Project type to set (e.g., 'app', 'mobile')
 
         Raises:
-            Exception: If there's an error updating project types
+            DatabaseOperationError: If there's an error updating project types.
         """
         with self._transaction("update project types") as cursor:
             params = [(project_type, key) for key in project_keys]
@@ -274,7 +275,8 @@ class DatabaseProcessor:
             releases: List of release tuples to save
 
         Raises:
-            Exception: If there's an error saving releases to the database
+            DatabaseOperationError: If there's an error saving releases to the
+                database.
         """
         # Create new list of tuples without the id field
         releases = [release[1:] for release in releases]
@@ -355,7 +357,7 @@ class DatabaseProcessor:
                 associated stories
 
         Raises:
-            Exception: If there's an error querying the database
+            DatabaseOperationError: If there's an error querying the database.
         """
         with self._transaction("retrieve releases without stories") as cursor:
             cursor.execute(
@@ -423,7 +425,8 @@ class DatabaseProcessor:
                 linked to its release via the releases_stories join table.
 
         Raises:
-            Exception: If there's an error saving stories to the database
+            DatabaseOperationError: If there's an error saving stories to the
+                database.
         """
         logger.info("Saving %d story-release pairs", len(stories))
 
@@ -546,7 +549,7 @@ class DatabaseProcessor:
                 pairs that don't have pull requests mapped to them.
 
         Raises:
-            Exception: If there's an error querying the database
+            DatabaseOperationError: If there's an error querying the database.
         """
         with self._transaction("retrieve stories without pull requests") as cursor:
             query = f"""
@@ -585,7 +588,8 @@ class DatabaseProcessor:
                 request URLs
 
         Raises:
-            Exception: If there's an error saving data to the database
+            DatabaseOperationError: If there's an error saving data to the
+                database.
         """
         zero_pr_story_keys = [
             story
@@ -719,13 +723,13 @@ class DatabaseProcessor:
 
         Args:
             limit (int, optional): Maximum number of records to retrieve.
-                Defaults to 0.
+                Defaults to ``PULL_REQUEST_BATCH_SIZE``.
 
         Returns:
             list[PullRequestIdentifier]: List of PullRequestIdentifier objects
 
         Raises:
-            Exception: If there's an error querying the database
+            DatabaseOperationError: If there's an error querying the database.
         """
         with self._transaction("retrieve pull requests without details") as cursor:
             query = f"""
@@ -773,7 +777,8 @@ class DatabaseProcessor:
                 fetch with 404 errors (optional)
 
         Raises:
-            Exception: If there's an error saving data to the database
+            DatabaseOperationError: If there's an error saving data to the
+                database.
         """
         if pull_request_fetch_failures_404 is None:
             pull_request_fetch_failures_404 = []
@@ -793,6 +798,7 @@ class DatabaseProcessor:
                     pr_open = ?,
                     pr_close = ?,
                     commit_count = ?,
+                    changed_files_count = ?,
                     earliest_commit_date = ?,
                     latest_commit_date = ?
                 WHERE
@@ -803,6 +809,7 @@ class DatabaseProcessor:
                     pr.open_date,
                     pr.close_date,
                     pr.commit_count,
+                    pr.changed_files_count,
                     pr.earliest_commit_date,
                     pr.latest_commit_date,
                     pr.id
@@ -857,7 +864,7 @@ class DatabaseProcessor:
         - Date ranges (earliest/ latest)
 
         Raises:
-            Exception: If there's an error querying the database
+            DatabaseOperationError: If there's an error querying the database.
         """
         database_name = (
             self.sqlite_path
@@ -916,7 +923,7 @@ class DatabaseProcessor:
         - Pull requests waiting for full details
 
         Raises:
-            Exception: If there's an error querying the database
+            DatabaseOperationError: If there's an error querying the database.
         """
         database_name = (
             self.sqlite_path

@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS pull_requests (
   pr_open DATE,
   pr_close DATE,
   commit_count INTEGER,
+  changed_files_count INTEGER,
   earliest_commit_date DATE,
   latest_commit_date DATE,
   pr_url VARCHAR(1024) GENERATED ALWAYS

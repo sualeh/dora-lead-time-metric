@@ -98,18 +98,19 @@ def seeded_db_path(tmp_path) -> str:
         """
         INSERT INTO pull_requests (id, pr_title, pr_owner, pr_repository,
                                    pr_number, pr_open, pr_close, commit_count,
-                                   earliest_commit_date, latest_commit_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                   changed_files_count, earliest_commit_date,
+                                   latest_commit_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [
             (1, "PR Open On Release", "acme", "repo", "1",
-             _iso(12), _iso(10), 3, _iso(15), _iso(11)),
+             _iso(12), _iso(10), 3, 2, _iso(15), _iso(11)),
             (2, "PR With Old Commits", "acme", "repo", "2",
-             _iso(2), _iso(1), 5, _iso(15), _iso(3)),
+             _iso(2), _iso(1), 5, 21, _iso(15), _iso(3)),
             (3, "PR Negative Lead", "acme", "repo", "3",
-             _iso(3), _iso(2), 2, _iso(4), _iso(3)),
+             _iso(3), _iso(2), 2, 1, _iso(4), _iso(3)),
             (4, "PR Older Multi Story", "acme", "repo", "4",
-             _iso(8), _iso(7), 2, _iso(9), _iso(8)),
+             _iso(8), _iso(7), 2, 2, _iso(9), _iso(8)),
         ],
     )
 
@@ -249,6 +250,26 @@ def test_report_pull_requests_in_multiple_stories(reports):
 
     # Tie-break on PR creation date should put newer PRs first.
     assert list(result["pr_number"]) == ["2", "4"]
+
+
+def test_report_pull_requests_with_high_complexity(reports):
+    """High-complexity PRs in the recent window should be reported."""
+    result = reports.report_pull_requests_with_high_complexity()
+
+    assert not result.empty
+    assert {
+        "pr_owner",
+        "pr_repository",
+        "pr_number",
+        "pr_title",
+        "pr_open",
+        "pr_url",
+        "commit_count",
+        "changed_files_count",
+        "complexity_score",
+    }.issubset(result.columns)
+    assert set(result["pr_number"]) == {"2"}
+    assert float(result.iloc[0]["complexity_score"]) > 6.0
 
 
 def test_report_zero_or_negative_lead_times(reports):

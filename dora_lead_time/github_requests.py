@@ -74,6 +74,59 @@ class GitHubRequests:
                 user_info.get("html_url") or user_info.get("url"),
             )
 
+    @staticmethod
+    def _get_next_page_url(response) -> str | None:
+        """Get the next pagination URL from a GitHub response."""
+        link_header = response.headers.get("Link")
+        if not link_header:
+            return None
+
+        for part in link_header.split(","):
+            section = part.strip().split(";")
+            if len(section) < 2:
+                continue
+            url_part = section[0].strip()
+            rel_part = section[1].strip()
+            if rel_part != 'rel="next"':
+                continue
+            if not url_part.startswith("<") or not url_part.endswith(">"):
+                continue
+            return url_part[1:-1]
+
+        return None
+
+    def _get_all_pr_commits(
+        self,
+        commits_url: str,
+        headers: dict[str, str],
+    ) -> list[dict]:
+        """Fetch all PR commit pages from GitHub."""
+        commits: list[dict] = []
+        next_url = f"{commits_url}?per_page=100"
+
+        while next_url:
+            commits_response = api_get(
+                next_url,
+                ApiSource.GITHUB,
+                headers,
+                timeout=self.request_timeout,
+                raise_on_error=False,
+            )
+            if commits_response.status_code != 200:
+                logger.warning(
+                    "Could not fetch commits for PR at %s (HTTP %s); commit "
+                    "data will be incomplete",
+                    next_url,
+                    commits_response.status_code,
+                )
+                break
+
+            page_commits = commits_response.json()
+            commits.extend(page_commits)
+            next_url = self._get_next_page_url(commits_response)
+
+        return commits
+
     def get_pull_request_details(
         self, pull_requests: list[PullRequestIdentifier]
     ) -> tuple[list[PullRequest], list[int]]:
@@ -174,24 +227,17 @@ class GitHubRequests:
 
             # Get commit data
             commits_url = f"{api_url}/commits"
-            commits_response = api_get(
-                commits_url, ApiSource.GITHUB, headers,
-                timeout=self.request_timeout, raise_on_error=False,
-            )
-            if commits_response.status_code != 200:
-                logger.warning(
-                    "Could not fetch commits for PR %s/%s/%s "
-                    "(HTTP %s); commit data will be empty",
-                    owner, repo, pr_number, commits_response.status_code
-                )
-                commits = []
-            else:
-                commits = commits_response.json()
+            commits = self._get_all_pr_commits(commits_url, headers)
 
             # Get earliest and latest commit date
             commit_dates = []
             for commit in commits:
-                commit_date = commit["commit"]["committer"]["date"]
+                commit_data = commit.get("commit", {})
+                author_date = commit_data.get("author", {}).get("date")
+                committer_date = commit_data.get("committer", {}).get("date")
+                commit_date = author_date or committer_date
+                if not commit_date:
+                    continue
                 commit_dates.append(
                     datetime.fromisoformat(commit_date.replace("Z", "+00:00"))
                     .date()
@@ -215,6 +261,7 @@ class GitHubRequests:
                 open_date=created_date,
                 close_date=closed_date,
                 commit_count=len(commits),
+                changed_files_count=pr_data.get("changed_files"),
                 earliest_commit_date=earliest_commit_date,
                 latest_commit_date=latest_commit_date,
                 owner=owner,

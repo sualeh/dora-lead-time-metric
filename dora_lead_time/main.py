@@ -250,8 +250,11 @@ def save_outlier_reports(config: LeadTimeConfiguration):
     Creates a new directory named "outlier_reports_yyyy-mm-dd-hh-mm-ss"
     and saves each outlier report as a CSV file within this directory.
 
+    Args:
+        config: Lead time configuration containing the database path.
+
     Returns:
-        str: Path to the created reports directory
+        pathlib.Path: Path to the created reports directory.
     """
     logger.info("Generating and saving outlier reports")
 
@@ -283,6 +286,8 @@ def save_outlier_reports(config: LeadTimeConfiguration):
             outlier_reports.report_pull_requests_with_old_commits,
         "pull_requests_in_multiple_stories":
             outlier_reports.report_pull_requests_in_multiple_stories,
+        "pull_requests_with_high_complexity":
+            outlier_reports.report_pull_requests_with_high_complexity,
         "stories_without_pull_requests":
             outlier_reports.report_stories_without_pull_requests,
         "counts_of_stories_without_pull_requests":
@@ -338,10 +343,6 @@ def _save_lead_time_chart(
         file_path (pathlib.Path): The file path where the chart will be
             saved.
 
-    Raises:
-        ValueError: If any of the input parameters are invalid.
-        IOError: If there is an issue saving the file.
-
     Side Effects:
         Saves the chart as a PNG file at the specified location.
         Logs the save operation.
@@ -376,11 +377,11 @@ def save_lead_time_charts(config: LeadTimeConfiguration):
     and an overall chart.
 
     Args:
-        start_date (date): Start date for lead time calculations (inclusive)
-        end_date (date): End date for lead time calculations (inclusive)
+        config: Lead time configuration containing the database path,
+            start date, and end date.
 
     Returns:
-        str: Path to the created charts directory
+        pathlib.Path: Path to the created charts directory.
     """
     logger.info("Generating and saving lead time charts")
 
