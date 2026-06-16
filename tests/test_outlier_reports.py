@@ -106,7 +106,7 @@ def seeded_db_path(tmp_path) -> str:
             (1, "PR Open On Release", "acme", "repo", "1",
              _iso(12), _iso(10), 3, 2, _iso(15), _iso(11)),
             (2, "PR With Old Commits", "acme", "repo", "2",
-             _iso(2), _iso(1), 5, 20, _iso(15), _iso(3)),
+             _iso(2), _iso(1), 5, 21, _iso(15), _iso(3)),
             (3, "PR Negative Lead", "acme", "repo", "3",
              _iso(3), _iso(2), 2, 1, _iso(4), _iso(3)),
             (4, "PR Older Multi Story", "acme", "repo", "4",
