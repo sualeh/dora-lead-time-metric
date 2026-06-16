@@ -258,18 +258,17 @@ def test_report_pull_requests_with_high_complexity(reports):
 
     assert not result.empty
     assert {
-        "pr_owner",
-        "pr_repository",
-        "pr_number",
+        "story_key",
+        "story_title",
         "pr_title",
-        "pr_open",
         "pr_url",
         "commit_count",
         "changed_files_count",
         "complexity_score",
     }.issubset(result.columns)
-    assert set(result["pr_number"]) == {"2"}
-    assert float(result.iloc[0]["complexity_score"]) > 6.0
+    assert set(result["story_key"]) == {"B-1", "OLDCOMMIT-1"}
+    assert set(result["pr_title"]) == {"PR With Old Commits"}
+    assert all(float(score) > 29.0 for score in result["complexity_score"])
 
 
 def test_report_zero_or_negative_lead_times(reports):
